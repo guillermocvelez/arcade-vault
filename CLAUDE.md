@@ -18,6 +18,9 @@ Package manager is npm (`package-lock.json` is present).
 
 There is no lint or test tooling configured in this repo yet (no ESLint/Vitest config present). Don't assume `npm run lint` or `npm run test` exist unless you add them.
 
+## skills
+Always use /frontend-design for user interface related workloads
+
 ## Spec-driven development workflow
 
 This project follows a Spec Driven Design workflow using the `/spec` and `/spec-impl` slash commands, based on practices from https://github.com/Klerith/fernando-skills. Those skills are installed via:
