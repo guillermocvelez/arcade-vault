@@ -21,6 +21,10 @@ There is no lint or test tooling configured in this repo yet (no ESLint/Vitest c
 ## skills
 Always use /frontend-design for user interface related workloads
 
+## Playwright MCP
+
+The local `playwright` MCP server is configured with `--output-dir .playwright-screenshots`, so all screenshots, snapshots, and console/network dumps it produces land in `.playwright-screenshots/` at the repo root (gitignored). If that server is ever re-added, keep the `--output-dir` flag pointing there.
+
 ## Spec-driven development workflow
 
 This project follows a Spec Driven Design workflow using the `/spec` and `/spec-impl` slash commands, based on practices from https://github.com/Klerith/fernando-skills. Those skills are installed via:
