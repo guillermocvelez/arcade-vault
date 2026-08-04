@@ -4,7 +4,7 @@ import { GAMES } from "~/data/games";
 definePageMeta({
   middleware: [
     (to) => {
-      if (!GAMES.some((g) => g.id === to.params.id)) return navigateTo("/");
+      if (!GAMES.some((g) => g.id === to.params.id)) return navigateTo("/games");
     },
   ],
 });
