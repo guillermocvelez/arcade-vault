@@ -18,7 +18,15 @@ logs
 .fleet
 .idea
 
+# Playwright MCP output
+.playwright-mcp
+.playwright-screenshots
+
 # Local env files
 .env
 .env.*
 !.env.example
+
+# 
+.playwright-screenshots/*
+!.playwright-screenshots/.gitkeep
