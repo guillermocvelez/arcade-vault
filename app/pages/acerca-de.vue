@@ -13,19 +13,34 @@ const highlights: { icon: "HEART" | "BROWSER" | "PLANT"; text: string; color: "m
   { icon: "PLANT", text: "PROYECTO EN CONSTANTE CRECIMIENTO", color: "green" },
 ];
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const form = ref<ContactForm>({ name: "", email: "", msg: "" });
 const sent = ref<string | null>(null);
 const shake = ref(false);
+const sending = ref(false);
+const sendError = ref(false);
 
-const onSubmit = () => {
-  if (!form.value.name.trim() || !form.value.email.trim() || !form.value.msg.trim()) {
+const onSubmit = async () => {
+  const { name, email, msg } = form.value;
+  if (!name.trim() || !email.trim() || !msg.trim() || !EMAIL_REGEX.test(email.trim())) {
     shake.value = true;
     setTimeout(() => {
       shake.value = false;
     }, 400);
     return;
   }
-  sent.value = form.value.name.trim();
+
+  sendError.value = false;
+  sending.value = true;
+  try {
+    await $fetch("/api/contact", { method: "POST", body: form.value });
+    sent.value = form.value.name.trim();
+  } catch {
+    sendError.value = true;
+  } finally {
+    sending.value = false;
+  }
 };
 
 const sendAnother = () => {
@@ -84,8 +99,8 @@ const sendAnother = () => {
           </div>
         </div>
 
-        <form :class="['contact-form', { shake }]" @submit.prevent="onSubmit">
-          <template v-if="!sent">
+        <form :class="['contact-form', { shake }]" novalidate @submit.prevent="onSubmit">
+          <template v-if="!sent && !sendError">
             <div class="field">
               <label>NOMBRE</label>
               <input v-model="form.name" placeholder="px_kai" />
@@ -98,8 +113,30 @@ const sendAnother = () => {
               <label>MENSAJE</label>
               <textarea v-model="form.msg" rows="5" placeholder="Cuéntanos qué tienes en mente…"></textarea>
             </div>
-            <button class="btn xl press" type="submit" style="width: 100%">▶ ENVIAR MENSAJE</button>
+            <button class="btn xl press" type="submit" style="width: 100%" :disabled="sending">
+              {{ sending ? "ENVIANDO..." : "▶ ENVIAR MENSAJE" }}
+            </button>
           </template>
+          <div v-else-if="sendError" class="terminal-success terminal-error">
+            <div class="term-bar">
+              <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+              <span class="term-title">VAULT-OS // TERMINAL</span>
+            </div>
+            <div class="term-body">
+              <div class="line"><span class="prompt">vault@arcade:~$</span> ./send_message --to=team</div>
+              <div class="line dim">[OK] Conectando con servidor…</div>
+              <div class="line dim">[OK] Validando contenido…</div>
+              <div class="line err">[ERROR] Falló la transmisión del paquete.</div>
+              <div class="line err">
+                &gt; NO SE PUDO ENVIAR EL MENSAJE. INTENTA DE NUEVO.<span class="caret">_</span>
+              </div>
+              <div style="margin-top: 18px">
+                <button class="btn ghost" type="button" :disabled="sending" @click="onSubmit">
+                  {{ sending ? "REINTENTANDO..." : "REINTENTAR ENVÍO" }}
+                </button>
+              </div>
+            </div>
+          </div>
           <div v-else class="terminal-success">
             <div class="term-bar">
               <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
