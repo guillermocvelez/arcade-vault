@@ -1,21 +1,17 @@
-export interface SavedScore {
-  game: string;
-  score: number;
+export interface ScoreRow {
+  rank: number;
   name: string;
-  at: number;
+  score: number;
+  date: string;
 }
 
-const STORAGE_KEY = "av_scores";
-
 export function useScores() {
-  const saveScore = (entry: Omit<SavedScore, "at">) => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const all: SavedScore[] = raw ? JSON.parse(raw) : [];
-      all.push({ ...entry, at: Date.now() });
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-    } catch {}
+  const saveScore = async (entry: { game: string; score: number; name: string }) => {
+    await $fetch("/api/scores", { method: "POST", body: entry });
   };
 
-  return { saveScore };
+  const fetchTop = (gameId: string, limit = 12) =>
+    $fetch<ScoreRow[]>("/api/scores", { query: { game: gameId, limit } });
+
+  return { saveScore, fetchTop };
 }

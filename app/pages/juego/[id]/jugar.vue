@@ -1,18 +1,15 @@
 <script setup lang="ts">
-import { GAMES } from "~/data/games";
 import type { EngineSnapshot } from "~/games/asteroids/engine";
-
-definePageMeta({
-  middleware: [
-    (to) => {
-      if (!GAMES.some((g) => g.id === to.params.id)) return navigateTo("/games");
-    },
-  ],
-});
 
 const route = useRoute();
 const id = route.params.id as string;
-const game = GAMES.find((g) => g.id === id);
+
+const { data: games } = await useAsyncData("games", fetchGamesList);
+const game = computed(() => games.value?.find((g) => g.id === id));
+
+if (!game.value) {
+  await navigateTo("/games");
+}
 
 const { user } = useAuth();
 const { saveScore } = useScores();
@@ -28,6 +25,8 @@ const paused = ref(false);
 const over = ref(false);
 const name = ref(user.value ? user.value.name : "INVITADO");
 const saved = ref(false);
+const saving = ref(false);
+const saveError = ref(false);
 
 let timer: ReturnType<typeof setInterval> | null = null;
 
@@ -87,6 +86,8 @@ const restart = () => {
   paused.value = false;
   over.value = false;
   saved.value = false;
+  saving.value = false;
+  saveError.value = false;
 };
 
 const heartsDisplay = computed(() => "♥ ".repeat(lives.value).trim() || "—");
@@ -96,10 +97,18 @@ const onNameInput = (e: Event) => {
   name.value = target.value.toUpperCase().slice(0, 10);
 };
 
-const handleSave = () => {
-  if (!game) return;
-  saveScore({ game: game.id, score: score.value, name: name.value });
-  saved.value = true;
+const handleSave = async () => {
+  if (!game.value) return;
+  saving.value = true;
+  saveError.value = false;
+  try {
+    await saveScore({ game: game.value.id, score: score.value, name: name.value });
+    saved.value = true;
+  } catch {
+    saveError.value = true;
+  } finally {
+    saving.value = false;
+  }
 };
 </script>
 
@@ -183,9 +192,14 @@ const handleSave = () => {
         <div class="final">{{ score.toLocaleString("es-ES") }}</div>
         <div v-if="!saved" class="input-row">
           <input :value="name" placeholder="TUS INICIALES" @input="onNameInput" />
-          <button class="btn yellow" @click="handleSave">GUARDAR PUNTUACIÓN</button>
+          <button class="btn yellow" :disabled="saving" @click="handleSave">
+            {{ saving ? "GUARDANDO..." : "GUARDAR PUNTUACIÓN" }}
+          </button>
         </div>
-        <div v-else class="toast-saved">▸ PUNTUACIÓN GUARDADA_</div>
+        <div v-if="saveError" class="toast-error">
+          ▸ NO SE PUDO GUARDAR. <button class="btn ghost" @click="handleSave">REINTENTAR</button>
+        </div>
+        <div v-if="saved" class="toast-saved">▸ PUNTUACIÓN GUARDADA_</div>
         <div class="actions">
           <button class="btn" @click="restart">JUGAR DE NUEVO</button>
           <NuxtLink to="/" class="btn magenta">VOLVER AL VAULT</NuxtLink>

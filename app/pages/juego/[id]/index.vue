@@ -1,21 +1,22 @@
 <script setup lang="ts">
-import { GAMES, seededScores } from "~/data/games";
-
-definePageMeta({
-  middleware: [
-    (to) => {
-      if (!GAMES.some((g) => g.id === to.params.id)) return navigateTo("/games");
-    },
-  ],
-});
-
 const route = useRoute();
 const id = route.params.id as string;
 
-const game = computed(() => GAMES.find((g) => g.id === id));
-const scores = computed(() => seededScores(id.length * 17 + 3, 10));
+const { fetchTop } = useScores();
 
-const rowClass = (i: number) => ["lb-row", i === 0 ? "top1" : i === 1 ? "top2" : i === 2 ? "top3" : ""];
+const { data: games } = await useAsyncData("games", fetchGamesList);
+const game = computed(() => games.value?.find((g) => g.id === id));
+
+if (!game.value) {
+  await navigateTo("/games");
+}
+
+const { data: scores } = await useAsyncData(`scores-${id}`, () => fetchTop(id, 10));
+
+const rowClass = (i: number) => [
+  "lb-row",
+  i === 0 ? "top1" : i === 1 ? "top2" : i === 2 ? "top3" : "",
+];
 </script>
 
 <template>
@@ -40,13 +41,21 @@ const rowClass = (i: number) => ["lb-row", i === 0 ? "top1" : i === 1 ? "top2" :
           </div>
           <div>
             <div class="l">Mejor global</div>
-            <div class="v" style="color: var(--magenta); text-shadow: 0 0 6px rgba(255, 0, 110, 0.5)">
+            <div
+              class="v"
+              style="color: var(--magenta); text-shadow: 0 0 6px rgba(255, 0, 110, 0.5)"
+            >
               {{ game.best.toLocaleString("es-ES") }}
             </div>
           </div>
           <div>
             <div class="l">Dificultad</div>
-            <div class="v" style="color: var(--yellow); text-shadow: 0 0 6px rgba(245, 255, 0, 0.5)">★ ★ ★ ☆ ☆</div>
+            <div
+              class="v"
+              style="color: var(--yellow); text-shadow: 0 0 6px rgba(245, 255, 0, 0.5)"
+            >
+              ★ ★ ★ ☆ ☆
+            </div>
           </div>
         </div>
         <div class="detail-actions">
@@ -63,7 +72,9 @@ const rowClass = (i: number) => ["lb-row", i === 0 ? "top1" : i === 1 ? "top2" :
           <div class="rk">#{{ String(r.rank).padStart(2, "0") }}</div>
           <div class="pl">
             {{ r.name }}
-            <div style="font-size: 10px; color: var(--ink-faint); letter-spacing: 0.1em">{{ r.date }}</div>
+            <div style="font-size: 10px; color: var(--ink-faint); letter-spacing: 0.1em">
+              {{ r.date }}
+            </div>
           </div>
           <div class="sc">{{ r.score.toLocaleString("es-ES") }}</div>
         </div>
