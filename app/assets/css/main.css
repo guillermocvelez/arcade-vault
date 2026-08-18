@@ -1261,6 +1261,17 @@ a {
     caret 0.8s steps(1) infinite;
   width: 0;
 }
+.toast-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--pixel);
+  font-size: 11px;
+  color: var(--red);
+  text-shadow: 0 0 8px var(--red);
+  margin-top: 14px;
+}
 @keyframes typewriter {
   to {
     width: 22ch;

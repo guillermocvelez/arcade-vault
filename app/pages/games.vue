@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { GAMES, CATS } from "~/data/games";
+import { CATS } from "~/data/games";
 import type { Game } from "~/data/games";
+
+const { games, pending } = useGames();
 
 const q = ref("");
 const cat = ref<(typeof CATS)[number]>("TODOS");
 
 const filtered = computed(() =>
-  GAMES.filter(
-    (g) => (cat.value === "TODOS" || g.cat === cat.value) && g.title.toLowerCase().includes(q.value.toLowerCase()),
+  (games.value ?? []).filter(
+    (g) =>
+      (cat.value === "TODOS" || g.cat === cat.value) &&
+      g.title.toLowerCase().includes(q.value.toLowerCase()),
   ),
 );
 
@@ -30,7 +34,13 @@ const goToDetail = (game: Game) => {
         <input v-model="q" placeholder="Buscar un juego por nombre…" />
       </div>
       <div class="av-chips">
-        <button v-for="c in CATS" :key="c" class="chip" :class="{ active: cat === c }" @click="cat = c">
+        <button
+          v-for="c in CATS"
+          :key="c"
+          class="chip"
+          :class="{ active: cat === c }"
+          @click="cat = c"
+        >
           {{ c }}
         </button>
       </div>
@@ -39,10 +49,20 @@ const goToDetail = (game: Game) => {
     <div class="av-grid">
       <GameCard v-for="g in filtered" :key="g.id" :game="g" @select="goToDetail" />
       <div
-        v-if="filtered.length === 0"
+        v-if="pending && filtered.length === 0"
         style="grid-column: 1 / -1; text-align: center; padding: 80px; color: var(--ink-faint)"
       >
-        <div class="pixel" style="font-size: 14px; color: var(--magenta); margin-bottom: 12px">NO HAY RESULTADOS</div>
+        <div class="pixel" style="font-size: 14px; color: var(--cyan); margin-bottom: 12px">
+          CARGANDO…
+        </div>
+      </div>
+      <div
+        v-else-if="filtered.length === 0"
+        style="grid-column: 1 / -1; text-align: center; padding: 80px; color: var(--ink-faint)"
+      >
+        <div class="pixel" style="font-size: 14px; color: var(--magenta); margin-bottom: 12px">
+          NO HAY RESULTADOS
+        </div>
         <div>Intenta otra búsqueda o categoría.</div>
       </div>
     </div>

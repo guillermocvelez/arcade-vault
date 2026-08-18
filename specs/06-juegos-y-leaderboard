@@ -1,0 +1,190 @@
+# SPEC 06 — Tabla de juegos y leaderboard real (Supabase)
+
+> **Estado:** Implementado
+> **Depende de:** `04-supabase-setup.md`
+> **Fecha:** 2026-08-18
+> **Objetivo:** Reemplazar el catálogo de juegos hardcodeado (`app/data/games.ts`) y las puntuaciones falsas (`seededScores`/`localStorage`) por tablas reales `games` y `scores` en Supabase, con endpoints de servidor para leer el catálogo, leer leaderboards y guardar puntuaciones, conectando las 5 pantallas que hoy usan datos simulados a datos reales.
+
+## Scope
+
+**In:**
+
+- Nueva tabla `games` en Supabase (id, title, short, long, cat, cover, color) que reemplaza el array `GAMES` hardcodeado en `app/data/games.ts`, sembrada vía migración con los 8 juegos actuales.
+- Nueva tabla `scores` en Supabase (id, game_id → games.id, name, score, created_at) que reemplaza el `localStorage` de `useScores.ts` y el generador fake `seededScores()`.
+- `best` (mejor puntuación) y `plays` (partidas jugadas) por juego se calculan dinámicamente a partir de `scores` (no son columnas manuales) — vía una vista `game_stats` (o consulta agregada equivalente) que se une con `games` al leer el catálogo.
+- Seed de datos de ejemplo: la migración inserta también ~10-12 scores de ejemplo por juego (usando los mismos valores que hoy genera `seededScores()`, pero como filas fijas), para que los leaderboards no arranquen vacíos.
+- RLS habilitado en ambas tablas: `SELECT` público (anon) en `games` y `scores`. `INSERT` en `scores` **no** tiene policy pública — solo se escribe desde el servidor.
+- Nuevos endpoints Nitro:
+  - `GET /api/games` — catálogo completo con `best`/`plays` calculados.
+  - `GET /api/scores?game=<id>&limit=<n>` — top N scores de un juego, ordenados por score descendente.
+  - `POST /api/scores` — recibe `{ game, name, score }`, valida (game existe, name no vacío, score numérico ≥ 0) y escribe usando la service role key (bypassa RLS).
+- Nuevo composable `useGames.ts` (fetch de `/api/games`) y reescritura de `useScores.ts` (`saveScore` llama a `POST /api/scores`; se agrega `fetchTop`/equivalente para leer leaderboards).
+- Actualización de las 5 pantallas que hoy usan datos fake para consumir estos endpoints/composables: `games.vue`, `GameCard.vue` (recibe `best`/`plays` reales vía props, sin cambio de UI), `juego/[id]/index.vue`, `juego/[id]/jugar.vue` (guardado real, con estado de "guardando"/error similar al patrón de SPEC 03), `salon-de-la-fama.vue`.
+- Formato de `plays` se mantiene igual que hoy (notación compacta tipo `12.4K`) aplicado sobre el conteo real.
+- `app/data/games.ts` conserva únicamente los tipos/constantes que siguen siendo útiles sin datos hardcodeados (`Game` interface, `CATS`); se elimina `GAMES`, `PLAYERS` y `seededScores()`.
+
+**Out of scope (para specs futuros):**
+
+- Autenticación real (`useAuth.ts` sigue siendo 100% fake/localStorage, sin cambios). Los scores no se vinculan a un `user_id` real.
+- Sección "TU MEJOR MARCA" en `salon-de-la-fama.vue` y `jugar.vue` — se elimina de este spec por no poder identificar de forma confiable qué score pertenece a qué jugador sin auth real.
+- Cualquier UI de administración (crear/editar/eliminar juegos) — la tabla `games` es de solo lectura desde la app; altas/bajas se hacen vía migración o directamente en Supabase.
+- Protección anti-spam/anti-trampa más allá de la validación básica del endpoint (mismo criterio que SPEC 03: sin honeypot, sin rate-limiting, sin verificación server-side de que el score sea "posible" para ese juego).
+- Tiempo real (Supabase Realtime) — los leaderboards se leen on-demand al cargar la página, sin suscripción a cambios en vivo.
+- Generación de tipos TypeScript desde la base de datos (`generate_typescript_types`) — se puede hacer en un spec futuro si aporta valor; no es requisito de este.
+- Migrar el mecanismo de guardado de vidas/nivel/estado de partida en curso — sigue siendo 100% client-side, solo el score final se persiste.
+
+## Data model
+
+```sql
+-- Tabla: games
+create table public.games (
+  id text primary key,                    -- slug, ej. "bloque-buster" (mismo id que hoy)
+  title text not null,
+  short text not null,
+  long text not null,
+  cat text not null check (cat in ('ARCADE', 'PUZZLE', 'SHOOTER', 'VERSUS')),
+  cover text not null,                     -- clase css, ej. "cover-bricks"
+  color text not null check (color in ('cyan', 'magenta', 'green', 'yellow')),
+  sort_order integer not null unique,     -- orden de despliegue (grilla, tabs), preserva el orden del GAMES original
+  created_at timestamptz not null default now()
+);
+
+alter table public.games enable row level security;
+create policy "games are publicly readable" on public.games
+  for select using (true);
+-- Sin policy de insert/update/delete pública: altas/bajas solo vía migración o Supabase Studio.
+
+-- Tabla: scores
+create table public.scores (
+  id uuid primary key default gen_random_uuid(),
+  game_id text not null references public.games(id),
+  name text not null,
+  score integer not null check (score >= 0),
+  created_at timestamptz not null default now()
+);
+
+alter table public.scores enable row level security;
+create policy "scores are publicly readable" on public.scores
+  for select using (true);
+-- Sin policy de insert pública: solo el endpoint server (service role) puede escribir.
+
+-- Vista: best/plays calculados por juego
+create view public.game_stats as
+select game_id, max(score) as best, count(*) as plays
+from public.scores
+group by game_id;
+```
+
+```ts
+// server/api/games.get.ts (respuesta)
+interface GameWithStats {
+  id: string;
+  title: string;
+  short: string;
+  long: string;
+  cat: "ARCADE" | "PUZZLE" | "SHOOTER" | "VERSUS";
+  cover: string;
+  color: "cyan" | "magenta" | "green" | "yellow";
+  sort_order: number;
+  best: number; // 0 si no tiene scores
+  plays: number; // conteo real, formateado en el cliente (ej. "12.4K")
+}
+// Ordenado por sort_order ascendente
+
+// server/api/scores.get.ts (query: ?game=<id>&limit=<n>, respuesta)
+interface ScoreRow {
+  rank: number; // calculado en el server según orden
+  name: string;
+  score: number;
+  date: string; // created_at formateado dd/mm/aaaa
+}
+
+// server/api/scores.post.ts
+interface ScorePayload {
+  game: string; // game_id, debe existir en games
+  name: string; // no vacío, se trunca a 10 chars (igual que hoy en jugar.vue)
+  score: number; // entero >= 0
+}
+interface ScoreSuccessResponse {
+  ok: true;
+}
+// Error: throws createError({ statusCode: 400 | 404 | 500, statusMessage: string })
+```
+
+```ts
+// app/composables/useGames.ts
+function useGames(): {
+  games: Ref<GameWithStats[] | null>;
+  pending: Ref<boolean>;
+  error: Ref<unknown>;
+};
+
+// app/composables/useScores.ts (reescrito)
+function useScores(): {
+  saveScore: (entry: { game: string; score: number; name: string }) => Promise<void>;
+  fetchTop: (gameId: string, limit?: number) => Promise<ScoreRow[]>;
+};
+```
+
+## Implementation plan
+
+1. Crear la migración de Supabase con las tablas `games` y `scores`, la vista `game_stats`, las policies de RLS (`select` público en ambas, sin `insert`/`update`/`delete` público), el seed de los 8 juegos actuales y el seed de ~10-12 scores de ejemplo por juego. Prueba: `list_tables` muestra `games` y `scores`; `execute_sql` confirma 8 filas en `games` y las filas de scores esperadas; `get_advisors` no reporta problemas de seguridad nuevos por RLS mal configurado.
+
+2. Crear `server/api/games.get.ts`: lee `games` unido con `game_stats` (o dos queries + merge en JS), devuelve `GameWithStats[]` con `best`/`plays` reales. Prueba: llamar al endpoint manualmente devuelve los 8 juegos con `best`/`plays` coherentes con el seed.
+
+3. Crear `server/api/scores.get.ts`: recibe `?game=<id>&limit=<n>` (default `limit=12`), devuelve las top N filas de `scores` para ese juego ordenadas por `score` descendente, con `rank` calculado. Prueba: llamar con un `game_id` sembrado devuelve las filas esperadas en orden correcto.
+
+4. Crear `server/api/scores.post.ts`: valida `{ game, name, score }` (game existe en `games`, name no vacío, score entero ≥ 0), inserta usando la service role key, devuelve `{ ok: true }` o `createError` en fallo. Prueba: POST manual crea una fila nueva; un GET posterior a `/api/scores?game=...` la refleja.
+
+5. Crear `app/composables/useGames.ts` (fetch de `/api/games` vía `useAsyncData`/`$fetch`) y actualizar `app/pages/games.vue` y `app/components/GameCard.vue` para consumir el catálogo real en vez de importar `GAMES` desde `app/data/games.ts`. Prueba: `games.vue` muestra los 8 juegos con búsqueda y filtro por categoría funcionando igual que antes.
+
+6. Reescribir `app/composables/useScores.ts` (`saveScore` hace `POST /api/scores`; nueva función para leer top scores de un juego) y actualizar `app/pages/juego/[id]/index.vue` (aside "MEJORES PUNTUACIONES" con datos reales) y `app/pages/juego/[id]/jugar.vue` (guardado real con estado "GUARDANDO..." y bloque de error/reintento, mismo patrón que SPEC 03). Prueba: jugar una partida completa, guardar el score, y verificar que aparece en el leaderboard de la pantalla de detalle del juego tras recargar.
+
+7. Actualizar `app/pages/salon-de-la-fama.vue`: tabs desde `useGames`, podio y tabla desde el leaderboard real por juego, eliminando la sección "TU MEJOR MARCA". Prueba: navegar el salón de la fama, cambiar entre tabs de juegos, y confirmar que podio + tabla muestran datos reales de Supabase.
+
+8. Limpiar `app/data/games.ts`: eliminar `GAMES`, `PLAYERS` y `seededScores()`; conservar únicamente `Game` (ajustado, sin `best`/`plays` si ya no aplican ahí) y `CATS`. Prueba: `npm run build` compila sin errores de imports rotos en ningún archivo que antes usaba `GAMES`/`seededScores`.
+
+9. Prueba de integración final: `npm run dev` arranca sin errores; recorrer las 8 pantallas (Home, Biblioteca, Detalle, Reproductor, Auth, Salón de la Fama, Acerca de) sin roturas visuales; jugar un juego y guardar un score, confirmar que se refleja en Detalle y en Salón de la Fama; intentar un `INSERT` directo a `scores` con la anon key (fuera del endpoint) y confirmar que falla por RLS; `npm run build` compila sin errores.
+
+## Acceptance criteria
+
+- [x] Las tablas `games` y `scores` existen en el proyecto Supabase, con RLS habilitado en ambas y solo policy de `select` pública (sin `insert`/`update`/`delete` públicos).
+- [x] `games` contiene los 8 juegos actuales (mismos `id`, `title`, `short`, `long`, `cat`, `cover`, `color` que hoy están en `app/data/games.ts`).
+- [x] `scores` contiene los scores de ejemplo sembrados por la migración (~10-12 por juego).
+- [x] `GET /api/games` devuelve los 8 juegos con `best`/`plays` calculados desde `scores` (no valores hardcodeados).
+- [x] `GET /api/scores?game=<id>&limit=<n>` devuelve las top N filas de ese juego ordenadas por score descendente.
+- [x] `POST /api/scores` con un payload válido crea una fila nueva en `scores` y un `GET` posterior la refleja; con un payload inválido (game inexistente, name vacío, score negativo) responde con error y no inserta nada.
+- [x] Un `insert` directo a `scores` usando la anon key (sin pasar por `/api/scores`) falla por RLS.
+- [x] `app/pages/games.vue` muestra el catálogo real vía `useGames`, con búsqueda y filtro por categoría funcionando igual que antes.
+- [x] `app/pages/juego/[id]/index.vue` muestra el leaderboard real del juego (top scores desde `/api/scores`) en vez de `seededScores()`.
+- [x] Jugar una partida en `app/pages/juego/[id]/jugar.vue`, guardar el score, muestra el estado "GUARDANDO..." mientras la petición está en curso y confirma el guardado al terminar; si la petición falla, se muestra un bloque de error con reintento (sin perder el score en pantalla).
+- [x] `app/pages/salon-de-la-fama.vue` muestra tabs, podio y tabla con datos reales por juego vía `useGames`/leaderboard real; la sección "TU MEJOR MARCA" ya no existe.
+- [x] `app/data/games.ts` ya no exporta `GAMES`, `PLAYERS` ni `seededScores()`.
+- [x] `npm run dev` levanta la app sin errores en consola del navegador ni de terminal.
+- [x] `npm run build` compila sin errores.
+- [x] Navegar las 7 pantallas existentes no muestra roturas visuales respecto al estado actual (fuera de los cambios de datos ya descritos).
+
+## Decisions
+
+- **Sí:** un solo spec para "tabla de juegos" y "leaderboard" en vez de dos specs separados. Están fuertemente acoplados (`scores.game_id` depende de `games`) y el usuario prefirió coordinarlos juntos. Decisión explícita del usuario.
+- **Sí:** el nombre del jugador en cada score sigue siendo un string libre ingresado en el modal "TUS INICIALES" (igual que hoy), sin vincularlo a un usuario real. Auth real (`useAuth.ts` → Supabase Auth) queda explícitamente fuera de este spec, consistente con la decisión de `04-supabase-setup.md` de no tocar autenticación todavía. Decisión explícita del usuario.
+- **Sí:** las escrituras a `scores` pasan por un endpoint de servidor (`POST /api/scores`) que valida el payload y usa la service role key, en vez de permitir `insert` público vía RLS. Evita exponer una policy de escritura abierta, aunque no evita por completo que alguien haga trampa enviando scores irreales al endpoint. Decisión explícita del usuario.
+- **Sí:** `best` y `plays` se calculan dinámicamente desde `scores` (vista `game_stats`) en vez de ser columnas manuales en `games`. Tiene más sentido con un leaderboard real, aunque implica una consulta agregada adicional en `GET /api/games`. Decisión explícita del usuario.
+- **No:** UI de administración (CRUD) para juegos. La tabla `games` es de solo lectura desde la app; altas/bajas futuras se hacen vía migración o Supabase Studio. Decisión explícita del usuario — mantiene el spec acotado.
+- **No:** sección "TU MEJOR MARCA" en `salon-de-la-fama.vue` ni en `jugar.vue`. Sin auth real no hay forma confiable de saber qué score pertenece a qué jugador si dos personas usan el mismo alias desde dispositivos distintos; se prefiere quitarla a aproximarla con localStorage. Queda pendiente para cuando exista auth real. Decisión explícita del usuario.
+- **Sí:** sembrar scores de ejemplo (~10-12 por juego) en la migración inicial, reutilizando los valores que hoy genera `seededScores()` pero como filas fijas. Evita que los leaderboards se vean vacíos el primer día. Decisión explícita del usuario.
+- **Sí:** el campo `plays` se sigue formateando en notación compacta (ej. `12.4K`) en el cliente, aplicada sobre el conteo real de `scores`, para mantener la estética actual aunque los números reales sean más chicos al principio. Decisión explícita del usuario.
+- **No:** Supabase Realtime para los leaderboards. Se leen on-demand al cargar cada página; agregar suscripciones en vivo queda para un spec futuro si se necesita.
+- **Sí:** agregar la columna `sort_order` (int, `unique`, `not null`) a `games`, no contemplada en el modelo de datos original. Ambigüedad detectada durante la implementación (Paso 2): Postgres no garantiza orden de fila sin `ORDER BY` explícito, y las 8 filas sembradas comparten el mismo `created_at` exacto (mismo `INSERT`), así que no había forma de preservar el orden visual del `GAMES` original (usado por la grilla de `games.vue` y por el tab por defecto de `salon-de-la-fama.vue`) sin una columna dedicada. Sembrada 1–8 según el orden del array original. Decisión explícita del usuario, elegida sobre ordenar alfabéticamente por `id`/`title`.
+- **No:** protección anti-spam/anti-trampa más allá de la validación básica del endpoint (game existe, name no vacío, score numérico ≥ 0). Mismo criterio que `03-contact-form-resend.md` — se acepta como riesgo conocido por ahora.
+- **Sí:** en `juego/[id]/index.vue` y `juego/[id]/jugar.vue`, la validación de id de juego inválido se implementó como un `await` directo en el `setup` de la página (`const { data: games } = await useAsyncData("games", fetchGamesList); if (!game.value) await navigateTo("/games")`) en vez de como `definePageMeta({ middleware: [...] })` async. Bug encontrado durante la implementación (Paso 6): un middleware de ruta async que hace `await` y luego llama `navigateTo` rompe el contexto de Nuxt (`useNuxtApp() called outside of a plugin...`), produciendo un 500 en vez de la redirección esperada — es un problema conocido de Nuxt con composables llamados después de un `await` en middleware sin `runWithContext`. El patrón de `await` directo en el `setup` de la página es más simple y evita el problema por completo, además de producir un 302 real en SSR en vez de una pantalla en blanco seguida de redirección client-side.
+
+## Risks
+
+| Riesgo                                                                                                                                                                                                                     | Mitigación                                                                                                                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sin auth real ni protección anti-trampa, cualquiera puede jugar y enviar un score arbitrariamente alto vía `POST /api/scores` (aunque no pueda saltarse la validación básica del endpoint), contaminando los leaderboards. | Aceptado como riesgo conocido por decisión explícita del usuario, mismo criterio que `03-contact-form-resend.md`. Si se vuelve un problema real, un spec futuro puede agregar límites de score por juego, rate-limiting o vincularlo a auth real.                           |
+| La vista `game_stats` (agregación `MAX`/`COUNT` sobre `scores`) puede degradar en performance a medida que crezca la tabla de scores, ya que `GET /api/games` la consulta en cada carga del catálogo.                      | Fuera de alcance optimizar en este spec dado el tamaño esperado (8 juegos, cientos de scores); si se vuelve un problema, se puede indexar `scores(game_id, score)` o cachear el resultado.                                                                                  |
+| Eliminar `GAMES`/`seededScores()` de `app/data/games.ts` puede romper silenciosamente algún import que no se detectó durante el mapeo de pantallas afectadas.                                                              | Mitigado por el paso 8 del plan (limpieza al final, después de migrar todos los consumidores conocidos) y por el criterio de aceptación de que `npm run build` compile sin errores.                                                                                         |
+| El service role key usada en `POST /api/scores` tiene permisos totales sobre la base de datos (bypassa RLS) — si se usa por error en código de cliente, expondría escritura/lectura sin restricciones a cualquiera.        | El endpoint vive exclusivamente en `server/api/`, igual que el patrón ya usado con `resendApiKey` en `03-contact-form-resend.md`; se debe revisar en la implementación que la service role key nunca se referencie desde código de cliente ni desde `runtimeConfig.public`. |
+| Los datos de ejemplo sembrados (scores fake) podrían confundirse con partidas reales una vez que la app tenga uso real, infladando artificialmente `best`/`plays`.                                                         | Aceptado como trade-off consciente para evitar leaderboards vacíos al lanzar; si se vuelve un problema, un spec futuro puede limpiar los datos de ejemplo o marcarlos con un flag para excluirlos de las estadísticas.                                                      |
