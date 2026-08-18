@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { GAMES } from "~/data/games";
+import type { EngineSnapshot } from "~/games/asteroids/engine";
 
 definePageMeta({
   middleware: [
@@ -16,9 +17,13 @@ const game = GAMES.find((g) => g.id === id);
 const { user } = useAuth();
 const { saveScore } = useScores();
 
+const isRealGame = computed(() => id === "rocas");
+const gameRef = ref<InstanceType<typeof AsteroidsGame> | null>(null);
+
 const score = ref(0);
 const lives = ref(3);
 const level = ref(1);
+const tripleShot = ref(0);
 const paused = ref(false);
 const over = ref(false);
 const name = ref(user.value ? user.value.name : "INVITADO");
@@ -35,6 +40,7 @@ const clearTimer = () => {
 
 const startTimer = () => {
   clearTimer();
+  if (isRealGame.value) return;
   if (!import.meta.client || over.value || paused.value) return;
   timer = setInterval(() => {
     score.value += Math.floor(10 + Math.random() * 90);
@@ -44,7 +50,14 @@ const startTimer = () => {
 watch([over, paused], startTimer, { immediate: true });
 
 watch(score, (s) => {
+  if (isRealGame.value) return;
   if (s > 0 && s % 2500 < 100) level.value += 1;
+});
+
+watch([paused, over], () => {
+  if (!isRealGame.value) return;
+  if (paused.value || over.value) gameRef.value?.pause();
+  else gameRef.value?.resume();
 });
 
 onUnmounted(clearTimer);
@@ -53,10 +66,24 @@ const endGame = () => {
   over.value = true;
 };
 
+const onSnapshot = (s: EngineSnapshot) => {
+  score.value = s.score;
+  lives.value = s.lives;
+  level.value = s.level;
+  tripleShot.value = s.tripleShot;
+};
+
+const onGameOver = (finalScore: number) => {
+  score.value = finalScore;
+  over.value = true;
+};
+
 const restart = () => {
+  if (isRealGame.value) gameRef.value?.restart();
   score.value = 0;
   lives.value = 3;
   level.value = 1;
+  tripleShot.value = 0;
   paused.value = false;
   over.value = false;
   saved.value = false;
@@ -96,9 +123,15 @@ const handleSave = () => {
           <div class="l">Nivel</div>
           <div class="v">{{ String(level).padStart(2, "0") }}</div>
         </div>
+        <div v-if="isRealGame && tripleShot > 0" class="hud-stat triple">
+          <div class="l">3x</div>
+          <div class="v">{{ tripleShot.toFixed(1) }}s</div>
+        </div>
       </div>
       <div class="hud-actions">
-        <button class="btn yellow" @click="paused = !paused">{{ paused ? "REANUDAR" : "PAUSA" }}</button>
+        <button class="btn yellow" @click="paused = !paused">
+          {{ paused ? "REANUDAR" : "PAUSA" }}
+        </button>
         <button class="btn magenta" @click="endGame">FIN</button>
         <NuxtLink :to="`/juego/${game.id}`" class="btn ghost">SALIR</NuxtLink>
       </div>
@@ -106,7 +139,13 @@ const handleSave = () => {
 
     <div class="crt">
       <div class="crt-screen">
-        <div class="game-arena">
+        <AsteroidsGame
+          v-if="isRealGame"
+          ref="gameRef"
+          @snapshot="onSnapshot"
+          @gameover="onGameOver"
+        />
+        <div v-else class="game-arena">
           <div class="grid-floor"></div>
           <div class="enemy e1"></div>
           <div class="enemy e2"></div>
@@ -116,7 +155,15 @@ const handleSave = () => {
         <div v-if="paused" class="crt-content" style="background: rgba(0, 0, 0, 0.6); z-index: 5">
           <div>
             <div class="pixel neon-yellow" style="font-size: 22px">EN PAUSA</div>
-            <div class="mono" style="font-size: 11px; color: var(--ink-dim); margin-top: 10px; letter-spacing: 0.16em">
+            <div
+              class="mono"
+              style="
+                font-size: 11px;
+                color: var(--ink-dim);
+                margin-top: 10px;
+                letter-spacing: 0.16em;
+              "
+            >
               PULSA REANUDAR PARA CONTINUAR
             </div>
           </div>
