@@ -27,6 +27,9 @@ logs
 .env.*
 !.env.example
 
+# Claude Code personal overrides (not shared with the team)
+.claude/settings.local.json
+
 # 
 .playwright-screenshots/*
 !.playwright-screenshots/.gitkeep

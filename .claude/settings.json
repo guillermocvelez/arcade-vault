@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "Formateando con Prettier + ESLint...",
+            "timeout": 90,
+            "command": "jq -r '.tool_response.filePath // .tool_input.file_path // empty' | { read -r f || exit 0; [ -n \"$f\" ] || exit 0; case \"$f\" in \"$CLAUDE_PROJECT_DIR\"/*) ;; *) exit 0 ;; esac; case \"$f\" in */node_modules/*|*/.nuxt/*|*/.output/*) exit 0 ;; esac; npx --no-install prettier --write --ignore-unknown \"$f\"; case \"$f\" in *.vue|*.ts|*.js|*.mjs|*.cjs) npx --no-install eslint --fix --no-warn-ignored \"$f\" ;; esac; } >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ]
+  }
+}
