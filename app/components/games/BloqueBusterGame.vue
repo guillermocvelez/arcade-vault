@@ -1,0 +1,40 @@
+<script setup lang="ts">
+import { BloqueBusterEngine, type EngineSnapshot } from "~/games/bloque-buster/engine";
+
+const emit = defineEmits<{
+  snapshot: [s: EngineSnapshot];
+  gameover: [score: number];
+}>();
+
+const canvasEl = ref<HTMLCanvasElement | null>(null);
+let engine: BloqueBusterEngine | null = null;
+let prevPhase: EngineSnapshot["phase"] | null = null;
+
+onMounted(() => {
+  if (!canvasEl.value) return;
+  engine = new BloqueBusterEngine(canvasEl.value);
+  engine.onSnapshot((s) => {
+    emit("snapshot", s);
+    if (s.phase === "gameover" && prevPhase !== "gameover") emit("gameover", s.score);
+    prevPhase = s.phase;
+  });
+  engine.start();
+});
+
+onUnmounted(() => {
+  engine?.stop();
+  engine = null;
+});
+
+const pause = () => engine?.pause();
+const resume = () => engine?.resume();
+const restart = () => engine?.restart();
+
+defineExpose({ pause, resume, restart });
+</script>
+
+<template>
+  <div class="game-stage">
+    <canvas ref="canvasEl" width="800" height="600" class="game-canvas"></canvas>
+  </div>
+</template>
