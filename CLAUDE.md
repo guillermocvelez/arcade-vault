@@ -14,12 +14,17 @@ Package manager is npm (`package-lock.json` is present).
 - `npm run build` — production build
 - `npm run generate` — static site generation
 - `npm run preview` — preview a production build locally
+- `npm run lint` / `npm run lint:fix` — ESLint
+- `npm run format` — Prettier
 - `postinstall` runs `nuxt prepare` automatically after `npm install`
 
-There is no lint or test tooling configured in this repo yet (no ESLint/Vitest config present). Don't assume `npm run lint` or `npm run test` exist unless you add them.
+There is no test tooling configured in this repo yet (no Vitest config present). Don't assume `npm run test` exists unless you add it.
 
 ## skills
-Always use /frontend-design for user interface related workloads
+
+Always use /frontend-design for user interface related workloads.
+
+Use `/add-game` (`.claude/skills/add-game`) before writing code for a new playable game — it designs the spec that wires a ported or from-scratch game into the `app/games/<id>/engine.ts` + `app/components/games/<Name>Game.vue` pattern (spec 05) and the real Supabase catalog/leaderboard (spec 06), then hands off to `/spec-impl`.
 
 ## Playwright MCP
 
