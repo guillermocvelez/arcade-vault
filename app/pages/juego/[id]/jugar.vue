@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import type { EngineSnapshot } from "~/games/asteroids/engine";
+import type { EngineSnapshot } from "~/games/types";
+import { GAME_ENGINES } from "~/games/registry";
+
+interface GameRef {
+  pause(): void;
+  resume(): void;
+  restart(): void;
+}
 
 const route = useRoute();
 const id = route.params.id as string;
@@ -14,13 +21,14 @@ if (!game.value) {
 const { user } = useAuth();
 const { saveScore } = useScores();
 
-const isRealGame = computed(() => id === "rocas");
-const gameRef = ref<InstanceType<typeof AsteroidsGame> | null>(null);
+const realGame = computed(() => GAME_ENGINES[id] ?? null);
+const isRealGame = computed(() => !!realGame.value);
+const gameRef = ref<GameRef | null>(null);
 
 const score = ref(0);
 const lives = ref(3);
 const level = ref(1);
-const tripleShot = ref(0);
+const extras = ref<EngineSnapshot["extras"]>(undefined);
 const paused = ref(false);
 const over = ref(false);
 const name = ref(user.value ? user.value.name : "INVITADO");
@@ -69,7 +77,7 @@ const onSnapshot = (s: EngineSnapshot) => {
   score.value = s.score;
   lives.value = s.lives;
   level.value = s.level;
-  tripleShot.value = s.tripleShot;
+  extras.value = s.extras;
 };
 
 const onGameOver = (finalScore: number) => {
@@ -82,7 +90,7 @@ const restart = () => {
   score.value = 0;
   lives.value = 3;
   level.value = 1;
-  tripleShot.value = 0;
+  extras.value = undefined;
   paused.value = false;
   over.value = false;
   saved.value = false;
@@ -132,9 +140,9 @@ const handleSave = async () => {
           <div class="l">Nivel</div>
           <div class="v">{{ String(level).padStart(2, "0") }}</div>
         </div>
-        <div v-if="isRealGame && tripleShot > 0" class="hud-stat triple">
-          <div class="l">3x</div>
-          <div class="v">{{ tripleShot.toFixed(1) }}s</div>
+        <div v-for="e in extras" :key="e.label" class="hud-stat triple">
+          <div class="l">{{ e.label }}</div>
+          <div class="v">{{ e.value }}</div>
         </div>
       </div>
       <div class="hud-actions">
@@ -148,8 +156,9 @@ const handleSave = async () => {
 
     <div class="crt">
       <div class="crt-screen">
-        <AsteroidsGame
-          v-if="isRealGame"
+        <component
+          :is="realGame"
+          v-if="realGame"
           ref="gameRef"
           @snapshot="onSnapshot"
           @gameover="onGameOver"

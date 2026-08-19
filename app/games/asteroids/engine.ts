@@ -3,15 +3,9 @@
 // sin globals de window/document del original — el canvas se recibe por
 // constructor y los listeners de teclado se agregan/quitan en start()/stop().
 
-export type Phase = "playing" | "dead" | "gameover";
+import type { EngineSnapshot, GameEngine, Phase } from "~/games/types";
 
-export interface EngineSnapshot {
-  score: number;
-  lives: number;
-  level: number;
-  tripleShot: number; // segundos restantes, 0 si inactivo
-  phase: Phase;
-}
+export type { Phase, EngineSnapshot } from "~/games/types";
 
 const W = 800;
 const H = 600;
@@ -344,7 +338,7 @@ class Particle {
 }
 
 // ── Motor ─────────────────────────────────────────────────────────────────────
-export class AsteroidsEngine {
+export class AsteroidsEngine implements GameEngine {
   private readonly ctx: CanvasRenderingContext2D;
 
   private ship: Ship = new Ship();
@@ -418,8 +412,11 @@ export class AsteroidsEngine {
       score: this.score,
       lives: this.lives,
       level: this.level,
-      tripleShot: this.ship.tripleShot > 0 ? this.ship.tripleShot : 0,
       phase: this.phase,
+      extras:
+        this.ship.tripleShot > 0
+          ? [{ label: "3x", value: `${this.ship.tripleShot.toFixed(1)}s` }]
+          : undefined,
     };
   }
 

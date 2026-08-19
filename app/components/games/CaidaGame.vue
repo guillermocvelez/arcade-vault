@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AsteroidsEngine, type EngineSnapshot } from "~/games/asteroids/engine";
+import { CaidaEngine, type EngineSnapshot } from "~/games/caida/engine";
 
 const emit = defineEmits<{
   snapshot: [s: EngineSnapshot];
@@ -7,12 +7,13 @@ const emit = defineEmits<{
 }>();
 
 const canvasEl = ref<HTMLCanvasElement | null>(null);
-let engine: AsteroidsEngine | null = null;
+const nextCanvasEl = ref<HTMLCanvasElement | null>(null);
+let engine: CaidaEngine | null = null;
 let prevPhase: EngineSnapshot["phase"] | null = null;
 
 onMounted(() => {
-  if (!canvasEl.value) return;
-  engine = new AsteroidsEngine(canvasEl.value);
+  if (!canvasEl.value || !nextCanvasEl.value) return;
+  engine = new CaidaEngine(canvasEl.value, nextCanvasEl.value);
   engine.onSnapshot((s) => {
     emit("snapshot", s);
     if (s.phase === "gameover" && prevPhase !== "gameover") emit("gameover", s.score);
@@ -35,6 +36,7 @@ defineExpose({ pause, resume, restart });
 
 <template>
   <div class="game-stage">
-    <canvas ref="canvasEl" width="800" height="600" class="game-canvas"></canvas>
+    <canvas ref="canvasEl" width="300" height="600" class="game-canvas"></canvas>
+    <canvas ref="nextCanvasEl" width="120" height="120" class="caida-preview"></canvas>
   </div>
 </template>
