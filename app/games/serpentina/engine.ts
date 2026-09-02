@@ -4,7 +4,7 @@
 // obtenido de https://www.spriters-resource.com/browser_games/googlesnakegame/,
 // ver spec 09 — Riesgos).
 
-import type { EngineSnapshot, GameEngine, Phase } from "~/games/types";
+import type { EngineSnapshot, GameEngine, Phase, SkinId } from "~/games/types";
 
 export type { Phase, EngineSnapshot } from "~/games/types";
 
@@ -162,6 +162,9 @@ export class SerpentinaEngine implements GameEngine {
     this.paused = false;
     this.initGame();
   }
+
+  // TODO(skins/serpentina): no-op temporal — la implementación real llega en specs/skins/serpentina.md
+  setSkin(_id: SkinId): void {}
 
   getSnapshot(): EngineSnapshot {
     return {

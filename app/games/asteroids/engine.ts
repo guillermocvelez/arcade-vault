@@ -3,7 +3,7 @@
 // sin globals de window/document del original — el canvas se recibe por
 // constructor y los listeners de teclado se agregan/quitan en start()/stop().
 
-import type { EngineSnapshot, GameEngine, Phase } from "~/games/types";
+import type { EngineSnapshot, GameEngine, Phase, SkinId } from "~/games/types";
 
 export type { Phase, EngineSnapshot } from "~/games/types";
 
@@ -406,6 +406,9 @@ export class AsteroidsEngine implements GameEngine {
     this.paused = false;
     this.initGame();
   }
+
+  // TODO(skins/rocas): no-op temporal — la implementación real llega en specs/skins/rocas.md
+  setSkin(_id: SkinId): void {}
 
   getSnapshot(): EngineSnapshot {
     return {

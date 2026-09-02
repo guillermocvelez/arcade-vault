@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type { EngineSnapshot } from "~/games/types";
+import type { EngineSnapshot, SkinId } from "~/games/types";
 import { GAME_ENGINES } from "~/games/registry";
+import { SKIN_IDS, SKIN_STORAGE_KEY, resolveSkin } from "~/games/skins";
 
 interface GameRef {
   pause(): void;
@@ -24,6 +25,17 @@ const { saveScore } = useScores();
 const realGame = computed(() => GAME_ENGINES[id] ?? null);
 const isRealGame = computed(() => !!realGame.value);
 const gameRef = ref<GameRef | null>(null);
+
+const skin = ref<SkinId>("clasico");
+
+onMounted(() => {
+  if (import.meta.client) skin.value = resolveSkin(localStorage.getItem(SKIN_STORAGE_KEY));
+});
+
+const setSkin = (id: SkinId) => {
+  skin.value = id;
+  if (import.meta.client) localStorage.setItem(SKIN_STORAGE_KEY, id);
+};
 
 const score = ref(0);
 const lives = ref(3);
@@ -146,6 +158,17 @@ const handleSave = async () => {
         </div>
       </div>
       <div class="hud-actions">
+        <div v-if="isRealGame" class="skin-seg" role="group" aria-label="Skin">
+          <button
+            v-for="s in SKIN_IDS"
+            :key="s.id"
+            class="skin-seg-btn"
+            :class="{ active: skin === s.id }"
+            @click="setSkin(s.id)"
+          >
+            {{ s.label }}
+          </button>
+        </div>
         <button class="btn yellow" @click="paused = !paused">
           {{ paused ? "REANUDAR" : "PAUSA" }}
         </button>
@@ -160,6 +183,7 @@ const handleSave = async () => {
           :is="realGame"
           v-if="realGame"
           ref="gameRef"
+          :skin="skin"
           @snapshot="onSnapshot"
           @gameover="onGameOver"
         />

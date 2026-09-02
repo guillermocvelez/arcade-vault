@@ -5,7 +5,7 @@
 // paddle, bola y explosiones se dibujan con fillRect/arc en vez de drawImage contra
 // el spritesheet original (sin sprites ni audio, ver spec 08 — Decisiones).
 
-import type { EngineSnapshot, GameEngine, Phase } from "~/games/types";
+import type { EngineSnapshot, GameEngine, Phase, SkinId } from "~/games/types";
 
 export type { Phase, EngineSnapshot } from "~/games/types";
 
@@ -212,6 +212,9 @@ export class BloqueBusterEngine implements GameEngine {
     this.paused = false;
     this.initGame();
   }
+
+  // TODO(skins/bloque-buster): no-op temporal — la implementación real llega en specs/skins/bloque-buster.md
+  setSkin(_id: SkinId): void {}
 
   getSnapshot(): EngineSnapshot {
     return {
