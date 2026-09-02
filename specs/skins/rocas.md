@@ -1,6 +1,6 @@
 # SPEC SKINS — ROCAS (Asteroids): skins clasico / retro / neon
 
-> **Estado:** Borrador
+> **Estado:** Implementado
 > **Depende de:** `specs/skins/00-contrato-skins.md`, `05-asteroids-rocas.md`
 > **Fecha:** 2026-08-31
 > **Objetivo:** Dar a `rocas` los 3 skins obligatorios (`clasico` default, `retro`, `neon`) según el contrato de `specs/skins/00-contrato-skins.md`. Sacar todos los literales de color de `app/games/asteroids/engine.ts` a `app/games/asteroids/skins.ts`, implementar `setSkin`, y cablear la prop `skin` en `app/components/games/AsteroidsGame.vue`. Sin cambios de jugabilidad, scoring, snapshot ni catálogo.
@@ -183,14 +183,14 @@ watch(
 
 ## Criterios de aceptación
 
-- [ ] `npm run build` / `npm run dev` sin errores ni `any`; `AsteroidsEngine` implementa `GameEngine` completo (incluido `setSkin`).
-- [ ] `app/games/asteroids/engine.ts` no contiene ningún literal de color (`#…`, `rgb(…)`, `rgba(…)` con canal de color fijo); todo sale de `this.palette` (se permite `globalAlpha` numérico para la llama y las partículas).
-- [ ] Skin `clasico` produce un render **pixel-equivalente** al de hoy (comparación visual lado a lado de nave, asteroides, balas, partículas, power-up, HUD y overlay GAME OVER).
-- [ ] Skin `retro`: paleta verde fósforo, ≤ 4 tonos + `bg`; nave/asteroides/HUD legibles; subtítulo del overlay legible (≥ 4.5:1).
-- [ ] Skin `neon`: glow visible en los elementos del mundo vía `shadowBlur`, HUD y overlay sin glow y nítidos, ningún color forzado a blanco, ~60 FPS con la pantalla saturada.
-- [ ] Los 3 botones del HUD cambian el skin **en caliente** (sin reiniciar la partida) y también con el juego en PAUSA; la selección persiste en `localStorage["av:skin"]` y sobrevive a recargar y a cambiar de juego real.
-- [ ] `caida`, `bloque-buster`, `serpentina` y los juegos mock: sin cambios visibles ni de comportamiento.
-- [ ] Todas las casillas de la checklist de modo oscuro del spec 00 marcadas, con la tabla `rol → hex → contraste` de este spec como evidencia.
+- [x] `npm run build` / `npm run dev` sin errores ni `any`; `AsteroidsEngine` implementa `GameEngine` completo (incluido `setSkin`).
+- [x] `app/games/asteroids/engine.ts` no contiene ningún literal de color (`#…`, `rgb(…)`, `rgba(…)` con canal de color fijo); todo sale de `this.palette` (se permite `globalAlpha` numérico para la llama y las partículas).
+- [x] Skin `clasico` produce un render **pixel-equivalente** al de hoy (comparación visual lado a lado de nave, asteroides, balas, partículas, power-up, HUD y overlay GAME OVER).
+- [x] Skin `retro`: paleta verde fósforo, ≤ 4 tonos + `bg`; nave/asteroides/HUD legibles; subtítulo del overlay legible (≥ 4.5:1).
+- [x] Skin `neon`: glow visible en los elementos del mundo vía `shadowBlur`, HUD y overlay sin glow y nítidos, ningún color forzado a blanco, ~60 FPS con la pantalla saturada.
+- [x] Los 3 botones del HUD cambian el skin **en caliente** (sin reiniciar la partida) y también con el juego en PAUSA; la selección persiste en `localStorage["av:skin"]` y sobrevive a recargar y a cambiar de juego real.
+- [x] `caida`, `bloque-buster`, `serpentina` y los juegos mock: sin cambios visibles ni de comportamiento.
+- [x] Todas las casillas de la checklist de modo oscuro del spec 00 marcadas, con la tabla `rol → hex → contraste` de este spec como evidencia.
 
 ## Decisiones
 
