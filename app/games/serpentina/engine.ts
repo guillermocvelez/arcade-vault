@@ -4,7 +4,8 @@
 // obtenido de https://www.spriters-resource.com/browser_games/googlesnakegame/,
 // ver spec 09 — Riesgos).
 
-import type { EngineSnapshot, GameEngine, Phase, SkinId } from "~/games/types";
+import type { EngineSnapshot, GameEngine, Palette, Phase, SkinId } from "~/games/types";
+import { SKINS } from "~/games/serpentina/skins";
 
 export type { Phase, EngineSnapshot } from "~/games/types";
 
@@ -121,11 +122,14 @@ export class SerpentinaEngine implements GameEngine {
 
   private snapshotCb: ((s: EngineSnapshot) => void) | null = null;
 
-  constructor(canvas: HTMLCanvasElement) {
+  private palette: Palette;
+
+  constructor(canvas: HTMLCanvasElement, skin: SkinId = "clasico") {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("No se pudo obtener el contexto 2D del canvas");
     this.ctx = ctx;
     this.canvas = canvas;
+    this.palette = SKINS[skin];
     this.fruitImage.src = "/games/serpentina/fruits.png";
   }
 
@@ -163,8 +167,10 @@ export class SerpentinaEngine implements GameEngine {
     this.initGame();
   }
 
-  // TODO(skins/serpentina): no-op temporal — la implementación real llega en specs/skins/serpentina.md
-  setSkin(_id: SkinId): void {}
+  setSkin(id: SkinId): void {
+    this.palette = SKINS[id];
+    this.draw();
+  }
 
   getSnapshot(): EngineSnapshot {
     return {
@@ -291,18 +297,30 @@ export class SerpentinaEngine implements GameEngine {
   // ── Draw ────────────────────────────────────────────────────────────────────
   private draw(): void {
     const ctx = this.ctx;
-    ctx.fillStyle = "#000";
+    const glow = this.palette.glowBlur;
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = this.palette.bg;
     ctx.fillRect(0, 0, W, H);
 
     for (let i = this.snake.length - 1; i >= 0; i--) {
       const seg = this.snake[i]!;
-      ctx.fillStyle = i === 0 ? "#4ade80" : "#16a34a";
+      const c = i === 0 ? this.palette.fg : this.palette.fgDim;
+      ctx.fillStyle = c;
+      if (glow > 0) {
+        ctx.shadowColor = c;
+        ctx.shadowBlur = glow;
+      }
       ctx.fillRect(seg.x * CELL, seg.y * CELL, CELL, CELL);
     }
+    ctx.shadowBlur = 0;
 
     const { pos, sprite } = this.food;
     if (this.fruitImage.complete && this.fruitImage.naturalWidth > 0) {
       const frame = FRUIT_ATLAS[sprite]!;
+      if (glow > 0) {
+        ctx.shadowColor = this.palette.accent;
+        ctx.shadowBlur = glow;
+      }
       ctx.drawImage(
         this.fruitImage,
         frame.x,
@@ -315,8 +333,13 @@ export class SerpentinaEngine implements GameEngine {
         CELL,
       );
     } else {
-      ctx.fillStyle = "#ef4444";
+      ctx.fillStyle = this.palette.accent;
+      if (glow > 0) {
+        ctx.shadowColor = this.palette.accent;
+        ctx.shadowBlur = glow;
+      }
       ctx.fillRect(pos.x * CELL, pos.y * CELL, CELL, CELL);
     }
+    ctx.shadowBlur = 0;
   }
 }

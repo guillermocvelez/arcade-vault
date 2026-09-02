@@ -6,7 +6,8 @@
 // acumulación del original (dropAccum += dt contra dropInterval) pero con dt
 // en segundos y clamped a 0.05s, igual que el resto del contrato de motores.
 
-import type { EngineSnapshot, GameEngine, SkinId } from "~/games/types";
+import type { EngineSnapshot, GameEngine, Palette, SkinId } from "~/games/types";
+import { PIECE_COLORS, SKINS } from "~/games/caida/skins";
 
 export type { EngineSnapshot } from "~/games/types";
 
@@ -14,20 +15,6 @@ const COLS = 10;
 const ROWS = 20;
 const BLOCK = 30;
 const NEXT_BLOCK = 30;
-
-const GRID_LINE = "rgba(255, 255, 255, 0.08)";
-
-const COLORS: Array<string | null> = [
-  null,
-  "#4dd0e1", // I - cyan
-  "#ffd54f", // O - yellow
-  "#ba68c8", // T - purple
-  "#81c784", // S - green
-  "#e57373", // Z - red
-  "#90caf9", // J - pale blue
-  "#ffb74d", // L - orange
-  "#9e9e9e", // N - tuerca (gris metálico)
-];
 
 const PIECES: Array<number[][] | null> = [
   null,
@@ -111,7 +98,10 @@ export class CaidaEngine implements GameEngine {
 
   private snapshotCb: ((s: EngineSnapshot) => void) | null = null;
 
-  constructor(canvas: HTMLCanvasElement, nextCanvas: HTMLCanvasElement) {
+  private palette: Palette;
+  private pieceColors: readonly (string | null)[];
+
+  constructor(canvas: HTMLCanvasElement, nextCanvas: HTMLCanvasElement, skin: SkinId = "clasico") {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("No se pudo obtener el contexto 2D del canvas");
     this.ctx = ctx;
@@ -119,6 +109,9 @@ export class CaidaEngine implements GameEngine {
     const nextCtx = nextCanvas.getContext("2d");
     if (!nextCtx) throw new Error("No se pudo obtener el contexto 2D del canvas de preview");
     this.nextCtx = nextCtx;
+
+    this.palette = SKINS[skin];
+    this.pieceColors = PIECE_COLORS[skin];
   }
 
   start(): void {
@@ -155,8 +148,11 @@ export class CaidaEngine implements GameEngine {
     this.initGame();
   }
 
-  // TODO(skins/caida): no-op temporal — la implementación real llega en specs/skins/caida.md
-  setSkin(_id: SkinId): void {}
+  setSkin(id: SkinId): void {
+    this.palette = SKINS[id];
+    this.pieceColors = PIECE_COLORS[id];
+    if (this.current) this.draw();
+  }
 
   getSnapshot(): EngineSnapshot {
     return {
@@ -358,20 +354,27 @@ export class CaidaEngine implements GameEngine {
     colorIndex: number,
     size: number,
     alpha?: number,
+    glow = true,
   ): void {
-    if (!colorIndex) return;
-    const color = COLORS[colorIndex];
+    const color = this.pieceColors[colorIndex];
+    if (!color) return;
     context.globalAlpha = alpha ?? 1;
-    context.fillStyle = color!;
+    context.fillStyle = color;
+    if (glow && this.palette.glowBlur > 0) {
+      context.shadowColor = color;
+      context.shadowBlur = this.palette.glowBlur;
+    }
     context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-    context.fillStyle = "rgba(255,255,255,0.12)";
+    context.shadowBlur = 0;
+    context.fillStyle = this.palette.fgDim;
     context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
     context.globalAlpha = 1;
   }
 
   private drawGrid(): void {
     const ctx = this.ctx;
-    ctx.strokeStyle = GRID_LINE;
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = this.palette.grid;
     ctx.lineWidth = 0.5;
     for (let c = 1; c < COLS; c++) {
       ctx.beginPath();
@@ -401,7 +404,9 @@ export class CaidaEngine implements GameEngine {
 
   private draw(): void {
     const ctx = this.ctx;
-    ctx.clearRect(0, 0, COLS * BLOCK, ROWS * BLOCK);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = this.palette.bg;
+    ctx.fillRect(0, 0, COLS * BLOCK, ROWS * BLOCK);
     this.drawGrid();
 
     for (let r = 0; r < ROWS; r++) {
@@ -414,7 +419,15 @@ export class CaidaEngine implements GameEngine {
     for (let r = 0; r < this.current.shape.length; r++) {
       for (let c = 0; c < this.current.shape[r]!.length; c++) {
         if (this.current.shape[r]![c]) {
-          this.drawBlock(ctx, this.current.x + c, gy + r, this.current.shape[r]![c]!, BLOCK, 0.2);
+          this.drawBlock(
+            ctx,
+            this.current.x + c,
+            gy + r,
+            this.current.shape[r]![c]!,
+            BLOCK,
+            0.2,
+            false,
+          );
         }
       }
     }

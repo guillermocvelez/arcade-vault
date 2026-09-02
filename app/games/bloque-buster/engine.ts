@@ -5,7 +5,8 @@
 // paddle, bola y explosiones se dibujan con fillRect/arc en vez de drawImage contra
 // el spritesheet original (sin sprites ni audio, ver spec 08 — Decisiones).
 
-import type { EngineSnapshot, GameEngine, Phase, SkinId } from "~/games/types";
+import type { EngineSnapshot, GameEngine, Palette, Phase, SkinId } from "~/games/types";
+import { BRICK_COLORS, SKINS, type BrickKey } from "~/games/bloque-buster/skins";
 
 export type { Phase, EngineSnapshot } from "~/games/types";
 
@@ -36,13 +37,13 @@ const CONTROL_CODES = new Set(["ArrowLeft", "ArrowRight"]);
 
 interface LevelDef {
   speed: number;
-  blocks: Array<{ col: number; row: number; color: string }>;
+  blocks: Array<{ col: number; row: number; color: BrickKey }>;
 }
 
 const LEVELS: LevelDef[] = (() => {
-  const rowColors1 = ["red", "yellow", "cyan", "magenta", "hotpink", "green"];
-  const rowColors2 = ["gray", "cyan", "hotpink", "yellow", "magenta", "green"];
-  const rowColors4 = ["cyan", "magenta", "green", "yellow", "hotpink", "red"];
+  const rowColors1: BrickKey[] = ["red", "yellow", "cyan", "magenta", "hotpink", "green"];
+  const rowColors2: BrickKey[] = ["gray", "cyan", "hotpink", "yellow", "magenta", "green"];
+  const rowColors4: BrickKey[] = ["cyan", "magenta", "green", "yellow", "hotpink", "red"];
 
   const l1: LevelDef["blocks"] = [];
   for (let row = 0; row < BLOCK_ROWS; row++)
@@ -112,7 +113,7 @@ interface Block {
   y: number;
   w: number;
   h: number;
-  color: string;
+  color: BrickKey;
   alive: boolean;
 }
 
@@ -126,7 +127,7 @@ interface Explosion {
   y: number;
   w: number;
   h: number;
-  color: string;
+  color: BrickKey;
   elapsed: number;
   particles: ExplosionParticle[];
 }
@@ -168,11 +169,16 @@ export class BloqueBusterEngine implements GameEngine {
 
   private snapshotCb: ((s: EngineSnapshot) => void) | null = null;
 
-  constructor(canvas: HTMLCanvasElement) {
+  private palette: Palette;
+  private brickColors: Record<BrickKey, string>;
+
+  constructor(canvas: HTMLCanvasElement, skin: SkinId = "clasico") {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("No se pudo obtener el contexto 2D del canvas");
     this.ctx = ctx;
     this.canvas = canvas;
+    this.palette = SKINS[skin];
+    this.brickColors = BRICK_COLORS[skin];
   }
 
   start(): void {
@@ -213,8 +219,18 @@ export class BloqueBusterEngine implements GameEngine {
     this.initGame();
   }
 
-  // TODO(skins/bloque-buster): no-op temporal — la implementación real llega en specs/skins/bloque-buster.md
-  setSkin(_id: SkinId): void {}
+  setSkin(id: SkinId): void {
+    this.palette = SKINS[id];
+    this.brickColors = BRICK_COLORS[id];
+    this.draw();
+  }
+
+  private applyGlow(color: string): void {
+    if (this.palette.glowBlur > 0) {
+      this.ctx.shadowColor = color;
+      this.ctx.shadowBlur = this.palette.glowBlur;
+    }
+  }
 
   getSnapshot(): EngineSnapshot {
     return {
@@ -395,14 +411,18 @@ export class BloqueBusterEngine implements GameEngine {
   // ── Draw ────────────────────────────────────────────────────────────────────
   private draw(): void {
     const ctx = this.ctx;
-    ctx.fillStyle = "#000";
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = this.palette.bg;
     ctx.fillRect(0, 0, W, H);
 
     for (const block of this.blocks) {
       if (!block.alive) continue;
-      ctx.fillStyle = block.color;
+      const hex = this.brickColors[block.color];
+      ctx.fillStyle = hex;
+      this.applyGlow(hex);
       ctx.fillRect(block.x, block.y, block.w, block.h);
     }
+    ctx.shadowBlur = 0;
 
     for (const exp of this.explosions) {
       const t = Math.min(exp.elapsed / EXPLOSION_DURATION, 1);
@@ -410,10 +430,13 @@ export class BloqueBusterEngine implements GameEngine {
       const cy = exp.y + exp.h / 2;
 
       ctx.globalAlpha = 1 - t;
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = this.palette.fg;
+      this.applyGlow(this.palette.fg);
       ctx.fillRect(exp.x, exp.y, exp.w, exp.h);
 
-      ctx.fillStyle = exp.color;
+      const hex = this.brickColors[exp.color];
+      ctx.fillStyle = hex;
+      this.applyGlow(hex);
       for (const p of exp.particles) {
         const dist = p.speed * t;
         const px = cx + Math.cos(p.angle) * dist;
@@ -424,10 +447,14 @@ export class BloqueBusterEngine implements GameEngine {
       }
       ctx.globalAlpha = 1;
     }
+    ctx.shadowBlur = 0;
 
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = this.palette.fg;
+    this.applyGlow(this.palette.fg);
     ctx.fillRect(this.paddle.x, this.paddle.y, this.paddle.w, this.paddle.h);
 
+    ctx.fillStyle = this.palette.fg;
+    this.applyGlow(this.palette.fg);
     ctx.beginPath();
     ctx.arc(
       this.ball.x + this.ball.w / 2,
@@ -437,5 +464,7 @@ export class BloqueBusterEngine implements GameEngine {
       Math.PI * 2,
     );
     ctx.fill();
+
+    ctx.shadowBlur = 0;
   }
 }
