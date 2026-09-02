@@ -6,7 +6,7 @@
 // acumulación del original (dropAccum += dt contra dropInterval) pero con dt
 // en segundos y clamped a 0.05s, igual que el resto del contrato de motores.
 
-import type { EngineSnapshot, GameEngine } from "~/games/types";
+import type { EngineSnapshot, GameEngine, SkinId } from "~/games/types";
 
 export type { EngineSnapshot } from "~/games/types";
 
@@ -154,6 +154,9 @@ export class CaidaEngine implements GameEngine {
     this.paused = false;
     this.initGame();
   }
+
+  // TODO(skins/caida): no-op temporal — la implementación real llega en specs/skins/caida.md
+  setSkin(_id: SkinId): void {}
 
   getSnapshot(): EngineSnapshot {
     return {

@@ -21,15 +21,15 @@ Required env vars (see `.env.example`): `RESEND_API_KEY`, `RESEND_TO_EMAIL`, `SU
 
 Pages (file-based routing under `app/pages/`):
 
-| Route               | File                   | Purpose                                                              |
-| ------------------- | ---------------------- | -------------------------------------------------------------------- |
-| `/`                 | `index.vue`            | Home                                                                 |
-| `/games`            | `games.vue`            | Catalog / "Biblioteca" see references/implemented_games.md when needed                                               |
-| `/juego/[id]`       | `juego/[id]/index.vue` | Game detail + per-game leaderboard                                   |
-| `/juego/[id]/jugar` | `juego/[id]/jugar.vue` | The player — real engine (via `app/games/registry.ts`) or mock arena |
-| `/salon-de-la-fama` | `salon-de-la-fama.vue` | Global leaderboard, filterable per game                              |
-| `/auth`             | `auth.vue`             | Login (Supabase auth)                                                |
-| `/acerca-de`        | `acerca-de.vue`        | About page                                                           |
+| Route               | File                   | Purpose                                                                |
+| ------------------- | ---------------------- | ---------------------------------------------------------------------- |
+| `/`                 | `index.vue`            | Home                                                                   |
+| `/games`            | `games.vue`            | Catalog / "Biblioteca" see references/implemented_games.md when needed |
+| `/juego/[id]`       | `juego/[id]/index.vue` | Game detail + per-game leaderboard                                     |
+| `/juego/[id]/jugar` | `juego/[id]/jugar.vue` | The player — real engine (via `app/games/registry.ts`) or mock arena   |
+| `/salon-de-la-fama` | `salon-de-la-fama.vue` | Global leaderboard, filterable per game                                |
+| `/auth`             | `auth.vue`             | Login (Supabase auth)                                                  |
+| `/acerca-de`        | `acerca-de.vue`        | About page                                                             |
 
 API (Nitro server routes under `server/api/`):
 
@@ -65,6 +65,12 @@ There is no test tooling configured in this repo yet (no Vitest config present).
 Always use /frontend-design for user interface related workloads.
 
 Use `/add-game` (`.claude/skills/add-game`) before writing code for a new playable game — it designs the spec that wires a ported or from-scratch game into the `app/games/<id>/engine.ts` + `app/components/games/<Name>Game.vue` pattern (see "Real-game engines" above, established by spec 05) and the real Supabase catalog/leaderboard (spec 06), then hands off to `/spec-impl`.
+
+## agents
+
+The `game-planner` subagent (`.claude/agents/game-planner.md`) decides _which_ game comes next: it weighs 3–5 candidates against a fit rubric (catalog slot, portable source, `GameEngine` contract fit, leaderboard-compatible scoring, category diversity, retro/CRT aesthetic, cost/risk) and records every verdict in `references/game-suggestions.md` so it never re-proposes something already built or rejected. It writes no code and no specs. Full chain: `game-planner` (what) → `/add-game` (spec) → `/spec-impl` (implementation).
+
+The `game-jam` subagent (`.claude/agents/game-jam.md`) is the unsupervised alternative to `/add-game`: give it a **theme** and it invents one original from-scratch game and writes its two full specs — `specs/game-jam/<game-id>/01-motor.md` (engine + Vue component + registry) and `02-plataforma.md` (`games` row + `cover-*` class + `scores` seed + leaderboard) — in the exact format of `specs/07-tetris-caida.md` / `specs/08-arkanoid-bloque-buster.md`. Unlike `/add-game` it never asks questions (every choice lands in each spec's Decisiones section) and it invents the catalog metadata itself. Its specs live isolated under `specs/game-jam/` and do **not** consume the global `NN-` sequence. It implements nothing; next step is `/spec-impl` on each file.
 
 ## Playwright MCP
 
