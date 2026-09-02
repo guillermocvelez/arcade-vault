@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { CaidaEngine, type EngineSnapshot } from "~/games/caida/engine";
+import type { SkinId } from "~/games/types";
+
+const props = defineProps<{ skin?: SkinId }>();
 
 const emit = defineEmits<{
   snapshot: [s: EngineSnapshot];
@@ -13,7 +16,7 @@ let prevPhase: EngineSnapshot["phase"] | null = null;
 
 onMounted(() => {
   if (!canvasEl.value || !nextCanvasEl.value) return;
-  engine = new CaidaEngine(canvasEl.value, nextCanvasEl.value);
+  engine = new CaidaEngine(canvasEl.value, nextCanvasEl.value, props.skin ?? "clasico");
   engine.onSnapshot((s) => {
     emit("snapshot", s);
     if (s.phase === "gameover" && prevPhase !== "gameover") emit("gameover", s.score);
@@ -26,6 +29,13 @@ onUnmounted(() => {
   engine?.stop();
   engine = null;
 });
+
+watch(
+  () => props.skin,
+  (s) => {
+    if (s) engine?.setSkin(s);
+  },
+);
 
 const pause = () => engine?.pause();
 const resume = () => engine?.resume();
