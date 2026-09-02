@@ -3,7 +3,8 @@
 // sin globals de window/document del original — el canvas se recibe por
 // constructor y los listeners de teclado se agregan/quitan en start()/stop().
 
-import type { EngineSnapshot, GameEngine, Phase, SkinId } from "~/games/types";
+import type { EngineSnapshot, GameEngine, Palette, Phase, SkinId } from "~/games/types";
+import { SKINS } from "~/games/asteroids/skins";
 
 export type { Phase, EngineSnapshot } from "~/games/types";
 
@@ -35,6 +36,27 @@ function randInt(min: number, max: number): number {
   return Math.floor(rand(min, max + 1));
 }
 
+/** Convierte un color de la paleta a `rgba(r,g,b,alpha)`. Acepta `#rgb` / `#rrggbb`.
+ *  Si el color ya viene como `rgb(...)` / `rgba(...)` lo devuelve tal cual — en ese
+ *  caso quien llama aplica el alpha vía `globalAlpha`. */
+function rgbaFrom(color: string, alpha: number): string {
+  if (!color.startsWith("#")) return color;
+  let hex = color.slice(1);
+  if (hex.length === 3) hex = hex[0]! + hex[0]! + hex[1]! + hex[1]! + hex[2]! + hex[2]!;
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha.toFixed(2)})`;
+}
+
+/** Glow del grupo "mundo": si la paleta lo pide (`glowBlur > 0`), fija
+ *  `shadowBlur` con el color del propio elemento. No-op en `clasico`. */
+function applyGlow(ctx: CanvasRenderingContext2D, palette: Palette, color: string): void {
+  if (palette.glowBlur <= 0) return;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = palette.glowBlur;
+}
+
 // ── Bullet ────────────────────────────────────────────────────────────────────
 class Bullet {
   x: number;
@@ -63,8 +85,9 @@ class Bullet {
     if (this.ttl <= 0) this.dead = true;
   }
 
-  draw(ctx: CanvasRenderingContext2D): void {
-    ctx.fillStyle = "#fff";
+  draw(ctx: CanvasRenderingContext2D, palette: Palette): void {
+    ctx.fillStyle = palette.fg;
+    applyGlow(ctx, palette, palette.fg);
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
     ctx.fill();
@@ -122,11 +145,12 @@ class Asteroid {
     ];
   }
 
-  draw(ctx: CanvasRenderingContext2D): void {
+  draw(ctx: CanvasRenderingContext2D, palette: Palette): void {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rot);
-    ctx.strokeStyle = "#fff";
+    ctx.strokeStyle = palette.fg;
+    applyGlow(ctx, palette, palette.fg);
     ctx.lineWidth = 1.5;
     ctx.lineJoin = "round";
     ctx.beginPath();
@@ -171,18 +195,20 @@ class PowerUp {
     if (this.ttl <= 0) this.dead = true;
   }
 
-  draw(ctx: CanvasRenderingContext2D): void {
+  draw(ctx: CanvasRenderingContext2D, palette: Palette): void {
     if (this.ttl < 2 && Math.floor(this.ttl * 8) % 2 === 0) return;
     const pulse = 0.85 + Math.sin(performance.now() / 150) * 0.15;
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(Math.PI / 4);
-    ctx.strokeStyle = "#0ff";
+    ctx.strokeStyle = palette.accent;
+    applyGlow(ctx, palette, palette.accent);
     ctx.lineWidth = 2;
     const r = this.radius * pulse;
     ctx.strokeRect(-r, -r, r * 2, r * 2);
     ctx.restore();
-    ctx.fillStyle = "#0ff";
+    ctx.fillStyle = palette.accent;
+    applyGlow(ctx, palette, palette.accent);
     ctx.font = "bold 12px monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -262,7 +288,7 @@ class Ship {
     return [new Bullet(ox, oy, this.angle)];
   }
 
-  draw(ctx: CanvasRenderingContext2D): void {
+  draw(ctx: CanvasRenderingContext2D, palette: Palette): void {
     if (this.dead) return;
     // Parpadeo durante invencibilidad de reaparición
     if (this.invincible > 0 && Math.floor(this.invincible * 8) % 2 === 0) return;
@@ -270,7 +296,8 @@ class Ship {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
-    ctx.strokeStyle = "#fff";
+    ctx.strokeStyle = palette.fg;
+    applyGlow(ctx, palette, palette.fg);
     ctx.lineWidth = 1.5;
     ctx.lineJoin = "round";
 
@@ -285,12 +312,16 @@ class Ship {
 
     // Llama del propulsor
     if (this.thrusting && Math.random() > 0.35) {
+      ctx.save();
+      ctx.globalAlpha = 0.85;
       ctx.beginPath();
       ctx.moveTo(-8, -4);
       ctx.lineTo(-8 - rand(6, 14), 0);
       ctx.lineTo(-8, 4);
-      ctx.strokeStyle = "rgba(255, 130, 0, 0.85)";
+      ctx.strokeStyle = palette.accentAlt;
+      applyGlow(ctx, palette, palette.accentAlt);
       ctx.stroke();
+      ctx.restore();
     }
 
     ctx.restore();
@@ -326,14 +357,22 @@ class Particle {
     if (this.ttl <= 0) this.dead = true;
   }
 
-  draw(ctx: CanvasRenderingContext2D): void {
+  draw(ctx: CanvasRenderingContext2D, palette: Palette): void {
     const alpha = this.ttl / this.life;
-    ctx.strokeStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
+    const stroke = rgbaFrom(palette.fg, alpha);
+    const viaGlobalAlpha = stroke === palette.fg;
+    if (viaGlobalAlpha) {
+      ctx.save();
+      ctx.globalAlpha *= alpha;
+    }
+    ctx.strokeStyle = stroke;
+    applyGlow(ctx, palette, palette.fg);
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(this.x, this.y);
     ctx.lineTo(this.x - this.vx * 0.05, this.y - this.vy * 0.05);
     ctx.stroke();
+    if (viaGlobalAlpha) ctx.restore();
   }
 }
 
@@ -365,10 +404,13 @@ export class AsteroidsEngine implements GameEngine {
 
   private snapshotCb: ((s: EngineSnapshot) => void) | null = null;
 
-  constructor(canvas: HTMLCanvasElement) {
+  private palette: Palette;
+
+  constructor(canvas: HTMLCanvasElement, skin: SkinId = "clasico") {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("No se pudo obtener el contexto 2D del canvas");
     this.ctx = ctx;
+    this.palette = SKINS[skin];
   }
 
   start(): void {
@@ -407,8 +449,10 @@ export class AsteroidsEngine implements GameEngine {
     this.initGame();
   }
 
-  // TODO(skins/rocas): no-op temporal — la implementación real llega en specs/skins/rocas.md
-  setSkin(_id: SkinId): void {}
+  setSkin(id: SkinId): void {
+    this.palette = SKINS[id];
+    this.draw();
+  }
 
   getSnapshot(): EngineSnapshot {
     return {
@@ -602,7 +646,7 @@ export class AsteroidsEngine implements GameEngine {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(-Math.PI / 2);
-    ctx.strokeStyle = "#fff";
+    ctx.strokeStyle = this.palette.fg;
     ctx.lineWidth = 1.2;
     ctx.lineJoin = "round";
     ctx.beginPath();
@@ -617,7 +661,7 @@ export class AsteroidsEngine implements GameEngine {
 
   private drawHUD(): void {
     const ctx = this.ctx;
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = this.palette.fg;
     ctx.font = "15px monospace";
 
     ctx.textAlign = "left";
@@ -630,7 +674,7 @@ export class AsteroidsEngine implements GameEngine {
 
     if (this.ship.tripleShot > 0) {
       ctx.textAlign = "left";
-      ctx.fillStyle = "#0ff";
+      ctx.fillStyle = this.palette.accent;
       ctx.fillText(`3x  ${this.ship.tripleShot.toFixed(1)}s`, 14, 46);
     }
   }
@@ -638,25 +682,32 @@ export class AsteroidsEngine implements GameEngine {
   private drawOverlay(title: string, sub: string): void {
     const ctx = this.ctx;
     ctx.textAlign = "center";
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = this.palette.fg;
     ctx.font = "bold 46px monospace";
     ctx.fillText(title, W / 2, H / 2 - 18);
     ctx.font = "18px monospace";
-    ctx.fillStyle = "rgba(255,255,255,0.65)";
+    ctx.fillStyle = this.palette.fgDim;
     ctx.fillText(sub, W / 2, H / 2 + 22);
   }
 
   private draw(): void {
     const ctx = this.ctx;
-    ctx.fillStyle = "#000";
+    const palette = this.palette;
+    ctx.fillStyle = palette.bg;
     ctx.fillRect(0, 0, W, H);
 
-    this.particles.forEach((p) => p.draw(ctx));
-    this.asteroids.forEach((a) => a.draw(ctx));
-    this.powerUps.forEach((p) => p.draw(ctx));
-    this.bullets.forEach((b) => b.draw(ctx));
-    this.ship.draw(ctx);
+    // Grupo "mundo": glow por `shadowBlur` si el skin lo pide (neon/retro).
+    const worldGlow = palette.glowBlur > 0;
+    if (worldGlow) ctx.save();
+    this.particles.forEach((p) => p.draw(ctx, palette));
+    this.asteroids.forEach((a) => a.draw(ctx, palette));
+    this.powerUps.forEach((p) => p.draw(ctx, palette));
+    this.bullets.forEach((b) => b.draw(ctx, palette));
+    this.ship.draw(ctx, palette);
+    if (worldGlow) ctx.restore();
 
+    // HUD + overlay nunca llevan glow — legibilidad ante todo.
+    ctx.shadowBlur = 0;
     this.drawHUD();
 
     if (this.phase === "gameover") this.drawOverlay("GAME OVER", `PUNTAJE: ${this.score}`);
