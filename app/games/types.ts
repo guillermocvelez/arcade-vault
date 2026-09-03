@@ -16,6 +16,14 @@ export interface Palette {
   //        ctx.shadowColor = color del propio elemento (nunca blanco)
 }
 
+/** Un botón táctil que el engine expone para que la capa Vue lo dibuje. */
+export interface TouchControl {
+  id: string; // identificador estable, p. ej. "girar-izq"
+  label: string; // glifo/carácter a pintar en el botón, p. ej. "◀" "▲" "⟳" "●"
+  kind: "hold" | "tap"; // hold = press+release mantenido; tap = pulso único
+  side: "left" | "right"; // en qué cúmulo (esquina) del stage se agrupa
+}
+
 export interface EngineSnapshot {
   score: number;
   lives: number;
@@ -33,4 +41,9 @@ export interface GameEngine {
   setSkin(id: SkinId): void;
   getSnapshot(): EngineSnapshot;
   onSnapshot(cb: (s: EngineSnapshot) => void): void;
+
+  // NUEVO — capa táctil
+  readonly touchControls: TouchControl[]; // estático por engine; [] si no aplica
+  pressControl(id: string): void; // id desconocido = no-op silencioso
+  releaseControl(id: string): void; // id desconocido = no-op silencioso
 }
