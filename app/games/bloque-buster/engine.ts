@@ -5,7 +5,14 @@
 // paddle, bola y explosiones se dibujan con fillRect/arc en vez de drawImage contra
 // el spritesheet original (sin sprites ni audio, ver spec 08 — Decisiones).
 
-import type { EngineSnapshot, GameEngine, Palette, Phase, SkinId } from "~/games/types";
+import type {
+  EngineSnapshot,
+  GameEngine,
+  Palette,
+  Phase,
+  SkinId,
+  TouchControl,
+} from "~/games/types";
 import { BRICK_COLORS, SKINS, type BrickKey } from "~/games/bloque-buster/skins";
 
 export type { Phase, EngineSnapshot } from "~/games/types";
@@ -244,6 +251,29 @@ export class BloqueBusterEngine implements GameEngine {
 
   onSnapshot(cb: (s: EngineSnapshot) => void): void {
     this.snapshotCb = cb;
+  }
+
+  // ── Capa táctil ─────────────────────────────────────────────────────────────
+  // Escribe en el mismo `keys` que consume `update()` para el paddle; `mousemove`
+  // queda intacto. Sin listeners nuevos en window.
+  private static readonly TOUCH_CODE: Record<string, string> = {
+    izq: "ArrowLeft",
+    der: "ArrowRight",
+  };
+
+  readonly touchControls: TouchControl[] = [
+    { id: "izq", label: "◀", kind: "hold", side: "left" },
+    { id: "der", label: "▶", kind: "hold", side: "right" },
+  ];
+
+  pressControl(id: string): void {
+    const code = BloqueBusterEngine.TOUCH_CODE[id];
+    if (code) this.keys[code] = true;
+  }
+
+  releaseControl(id: string): void {
+    const code = BloqueBusterEngine.TOUCH_CODE[id];
+    if (code) this.keys[code] = false;
   }
 
   // ── Input ───────────────────────────────────────────────────────────────────

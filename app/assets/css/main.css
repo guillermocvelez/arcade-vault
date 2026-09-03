@@ -1003,6 +1003,11 @@ a {
   color: var(--yellow);
   text-shadow: 0 0 6px rgba(245, 255, 0, 0.5);
 }
+.hud-stats {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
 .hud-actions {
   display: flex;
   gap: 10px;
@@ -1196,9 +1201,13 @@ a {
   align-items: center;
   justify-content: center;
   background: #000;
+  /* El gesto sobre el área de juego no scrollea, no hace zoom ni pull-to-refresh
+     (spec 10). Sólo acá y en .tc-btn — nunca en .crt ni .av-player. */
+  touch-action: none;
 }
 .game-canvas {
   display: block;
+  touch-action: none;
   max-width: 100%;
   max-height: 100%;
   width: auto;
@@ -1214,6 +1223,201 @@ a {
   height: auto;
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid var(--line);
+}
+
+/* ===== controles táctiles (spec 10) =====
+   Botones tipo cabina de arcade en una barra BAJO el CRT (hay espacio vertical
+   libre en móvil y así no tapan zonas jugables del canvas ni pelean con el
+   aspect-ratio 4/3). Cyan = dirección mantenida (hold), magenta = acción
+   discreta (tap). Sin reacción a :hover — son sólo para dedo. */
+.tc-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 0 2px;
+}
+.tc-cluster {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: clamp(8px, 2vw, 16px);
+}
+.tc-cluster.left {
+  justify-content: flex-start;
+}
+.tc-cluster.right {
+  justify-content: flex-end;
+}
+.tc-btn {
+  width: clamp(56px, 14vw, 72px);
+  height: clamp(56px, 14vw, 72px);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font-family: var(--mono);
+  font-size: clamp(20px, 5vw, 26px);
+  line-height: 1;
+  color: var(--cyan);
+  background: rgba(0, 0, 0, 0.45);
+  border: 2px solid var(--cyan);
+  border-radius: 50%;
+  box-shadow:
+    0 0 12px rgba(0, 245, 255, 0.35),
+    inset 0 0 10px rgba(0, 245, 255, 0.15);
+  text-shadow: 0 0 8px rgba(0, 245, 255, 0.6);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  transition:
+    transform 80ms ease-out,
+    box-shadow 80ms ease-out,
+    background 80ms ease-out;
+}
+.tc-btn[data-kind="tap"] {
+  color: var(--magenta);
+  border-color: var(--magenta);
+  box-shadow:
+    0 0 12px rgba(255, 0, 110, 0.35),
+    inset 0 0 10px rgba(255, 0, 110, 0.15);
+  text-shadow: 0 0 8px rgba(255, 0, 110, 0.6);
+}
+.tc-btn:active {
+  transform: translateY(2px) scale(0.94);
+  background: rgba(0, 245, 255, 0.16);
+  box-shadow:
+    0 0 20px rgba(0, 245, 255, 0.6),
+    inset 0 0 16px rgba(0, 245, 255, 0.3);
+}
+.tc-btn[data-kind="tap"]:active {
+  background: rgba(255, 0, 110, 0.16);
+  box-shadow:
+    0 0 20px rgba(255, 0, 110, 0.6),
+    inset 0 0 16px rgba(255, 0, 110, 0.3);
+}
+.tc-btn:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tc-btn {
+    transition: none;
+  }
+  .tc-btn:active {
+    transform: none;
+  }
+}
+/* Puntero fino (escritorio): aunque el v-if ya evita montarla, la ocultamos por
+   las dudas en híbridos donde el componente pudiera renderizarse. */
+@media (pointer: fine) and (hover: hover) {
+  .tc-bar {
+    display: none;
+  }
+}
+
+/* ===== player compacto (spec 10) =====
+   Puntero grueso (.av-player--compact) o viewport angosto (<=720px): el HUD de
+   stats colapsa a una línea, se ocultan Jugador y el selector de Skin, y los
+   botones PAUSA/FIN/SALIR se achican para dejarle altura al CRT y a la barra
+   táctil que va debajo. */
+.av-player--compact .player-hud {
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  gap: 8px 14px;
+}
+.av-player--compact .hud-stats {
+  gap: 4px 16px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.av-player--compact .hud-stats::-webkit-scrollbar {
+  display: none;
+}
+.av-player--compact .hud-stat {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+}
+.av-player--compact .hud-stat .l {
+  font-size: 8px;
+}
+.av-player--compact .hud-stat .v {
+  font-size: 12px;
+}
+.av-player--compact .hud-stat.player {
+  display: none;
+}
+.av-player--compact .skin-seg {
+  display: none;
+}
+.av-player--compact .hud-actions {
+  gap: 6px;
+}
+.av-player--compact .hud-actions .btn {
+  padding: 8px 10px;
+  font-size: 8px;
+}
+.av-player--compact .crt {
+  padding: 10px;
+  border-radius: 16px;
+}
+.av-player--compact .crt-bottom {
+  margin-top: 8px;
+  font-size: 6px;
+}
+/* Mismo colapso por ancho, sin depender de JS (segundo disparador del spec). */
+@media (max-width: 720px) {
+  .av-player .player-hud {
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    gap: 8px 14px;
+  }
+  .av-player .hud-stats {
+    gap: 4px 16px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .av-player .hud-stats::-webkit-scrollbar {
+    display: none;
+  }
+  .av-player .hud-stat {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .av-player .hud-stat .l {
+    font-size: 8px;
+  }
+  .av-player .hud-stat .v {
+    font-size: 12px;
+  }
+  .av-player .hud-stat.player {
+    display: none;
+  }
+  .av-player .skin-seg {
+    display: none;
+  }
+  .av-player .hud-actions {
+    gap: 6px;
+  }
+  .av-player .hud-actions .btn {
+    padding: 8px 10px;
+    font-size: 8px;
+  }
+  .av-player .crt {
+    padding: 10px;
+    border-radius: 16px;
+  }
+  .av-player .crt-bottom {
+    margin-top: 8px;
+    font-size: 6px;
+  }
 }
 
 /* game over modal */

@@ -41,7 +41,15 @@ const pause = () => engine?.pause();
 const resume = () => engine?.resume();
 const restart = () => engine?.restart();
 
-defineExpose({ pause, resume, restart });
+// La capa táctil (spec 10) se renderiza en jugar.vue, en una barra bajo el CRT.
+defineExpose({
+  pause,
+  resume,
+  restart,
+  touchControls: () => engine?.touchControls ?? [],
+  pressControl: (id: string) => engine?.pressControl(id),
+  releaseControl: (id: string) => engine?.releaseControl(id),
+});
 </script>
 
 <template>

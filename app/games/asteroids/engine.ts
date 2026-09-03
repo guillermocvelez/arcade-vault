@@ -3,7 +3,14 @@
 // sin globals de window/document del original — el canvas se recibe por
 // constructor y los listeners de teclado se agregan/quitan en start()/stop().
 
-import type { EngineSnapshot, GameEngine, Palette, Phase, SkinId } from "~/games/types";
+import type {
+  EngineSnapshot,
+  GameEngine,
+  Palette,
+  Phase,
+  SkinId,
+  TouchControl,
+} from "~/games/types";
 import { SKINS } from "~/games/asteroids/skins";
 
 export type { Phase, EngineSnapshot } from "~/games/types";
@@ -469,6 +476,41 @@ export class AsteroidsEngine implements GameEngine {
 
   onSnapshot(cb: (s: EngineSnapshot) => void): void {
     this.snapshotCb = cb;
+  }
+
+  // ── Capa táctil ─────────────────────────────────────────────────────────────
+  // Enruta al mismo estado de input que el teclado (`keys` / `justPressed`);
+  // no registra listeners nuevos en window.
+  private static readonly TOUCH_CODE: Record<string, string> = {
+    "girar-izq": "ArrowLeft",
+    "girar-der": "ArrowRight",
+    propulsar: "ArrowUp",
+    disparar: "Space",
+  };
+
+  readonly touchControls: TouchControl[] = [
+    { id: "girar-izq", label: "◀", kind: "hold", side: "left" },
+    { id: "girar-der", label: "▶", kind: "hold", side: "left" },
+    { id: "propulsar", label: "▲", kind: "hold", side: "right" },
+    { id: "disparar", label: "●", kind: "tap", side: "right" },
+  ];
+
+  pressControl(id: string): void {
+    const code = AsteroidsEngine.TOUCH_CODE[id];
+    if (!code) return;
+    if (code === "Space") {
+      // tap: pulso discreto, equivale al keydown que `update()` consume vía `pressed("Space")`
+      this.justPressed["Space"] = true;
+      return;
+    }
+    if (!this.keys[code]) this.justPressed[code] = true;
+    this.keys[code] = true;
+  }
+
+  releaseControl(id: string): void {
+    const code = AsteroidsEngine.TOUCH_CODE[id];
+    if (!code || code === "Space") return;
+    this.keys[code] = false;
   }
 
   // ── Input ───────────────────────────────────────────────────────────────────

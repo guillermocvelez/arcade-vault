@@ -6,7 +6,7 @@
 // acumulación del original (dropAccum += dt contra dropInterval) pero con dt
 // en segundos y clamped a 0.05s, igual que el resto del contrato de motores.
 
-import type { EngineSnapshot, GameEngine, Palette, SkinId } from "~/games/types";
+import type { EngineSnapshot, GameEngine, Palette, SkinId, TouchControl } from "~/games/types";
 import { PIECE_COLORS, SKINS } from "~/games/caida/skins";
 
 export type { EngineSnapshot } from "~/games/types";
@@ -91,6 +91,11 @@ export class CaidaEngine implements GameEngine {
   private dropInterval = 1;
   private dropAccum = 0;
 
+  // Soft-drop mantenido desde el botón táctil `bajar` (el teclado lo consigue vía
+  // repetición de `keydown`; táctil no repite, así que lo modela una bandera).
+  private softDropping = false;
+  private static readonly SOFT_DROP_INTERVAL = 0.05;
+
   private running = false;
   private paused = false;
   private rafId: number | null = null;
@@ -131,6 +136,7 @@ export class CaidaEngine implements GameEngine {
       this.rafId = null;
     }
     window.removeEventListener("keydown", this.onKeyDown);
+    this.softDropping = false;
   }
 
   pause(): void {
@@ -166,6 +172,42 @@ export class CaidaEngine implements GameEngine {
 
   onSnapshot(cb: (s: EngineSnapshot) => void): void {
     this.snapshotCb = cb;
+  }
+
+  // ── Capa táctil ─────────────────────────────────────────────────────────────
+  // Enruta a las mismas acciones que `onKeyDown`, reusando su guard. Sin
+  // listeners nuevos en window.
+  readonly touchControls: TouchControl[] = [
+    { id: "izq", label: "◀", kind: "tap", side: "left" },
+    { id: "der", label: "▶", kind: "tap", side: "left" },
+    { id: "bajar", label: "▼", kind: "hold", side: "left" },
+    { id: "rotar", label: "⟳", kind: "tap", side: "right" },
+    { id: "soltar", label: "⤓", kind: "tap", side: "right" },
+  ];
+
+  pressControl(id: string): void {
+    if (!this.running || this.paused || this.phase !== "playing") return;
+    switch (id) {
+      case "izq":
+        this.tryMove(-1);
+        break;
+      case "der":
+        this.tryMove(1);
+        break;
+      case "rotar":
+        this.tryRotate();
+        break;
+      case "soltar":
+        this.hardDrop();
+        break;
+      case "bajar":
+        this.softDropping = true;
+        break;
+    }
+  }
+
+  releaseControl(id: string): void {
+    if (id === "bajar") this.softDropping = false;
   }
 
   // ── Input ───────────────────────────────────────────────────────────────────
@@ -210,10 +252,14 @@ export class CaidaEngine implements GameEngine {
   private update(dt: number): void {
     if (this.phase === "gameover") return;
     this.dropAccum += dt;
-    if (this.dropAccum >= this.dropInterval) {
+    const interval = this.softDropping
+      ? Math.min(this.dropInterval, CaidaEngine.SOFT_DROP_INTERVAL)
+      : this.dropInterval;
+    if (this.dropAccum >= interval) {
       this.dropAccum = 0;
       if (!this.collide(this.current.shape, this.current.x, this.current.y + 1)) {
         this.current.y++;
+        if (this.softDropping) this.score += 1; // mismo bonus que softDrop()
       } else {
         this.lockPiece();
       }
@@ -342,6 +388,7 @@ export class CaidaEngine implements GameEngine {
     this.phase = "playing";
     this.dropInterval = 1;
     this.dropAccum = 0;
+    this.softDropping = false;
     this.next = this.randomPiece();
     this.spawn();
   }

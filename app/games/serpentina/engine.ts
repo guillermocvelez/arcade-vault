@@ -4,7 +4,14 @@
 // obtenido de https://www.spriters-resource.com/browser_games/googlesnakegame/,
 // ver spec 09 — Riesgos).
 
-import type { EngineSnapshot, GameEngine, Palette, Phase, SkinId } from "~/games/types";
+import type {
+  EngineSnapshot,
+  GameEngine,
+  Palette,
+  Phase,
+  SkinId,
+  TouchControl,
+} from "~/games/types";
 import { SKINS } from "~/games/serpentina/skins";
 
 export type { Phase, EngineSnapshot } from "~/games/types";
@@ -184,6 +191,32 @@ export class SerpentinaEngine implements GameEngine {
 
   onSnapshot(cb: (s: EngineSnapshot) => void): void {
     this.snapshotCb = cb;
+  }
+
+  // ── Capa táctil ─────────────────────────────────────────────────────────────
+  // Igual que `onKeyDown`: fija `pendingDirection`. El bloqueo de giro de 180°
+  // ya vive en `step()`. Sin listeners nuevos en window.
+  private static readonly TOUCH_DIR: Record<string, Direction> = {
+    arriba: "up",
+    abajo: "down",
+    izq: "left",
+    der: "right",
+  };
+
+  readonly touchControls: TouchControl[] = [
+    { id: "arriba", label: "▲", kind: "tap", side: "right" },
+    { id: "abajo", label: "▼", kind: "tap", side: "right" },
+    { id: "izq", label: "◀", kind: "tap", side: "left" },
+    { id: "der", label: "▶", kind: "tap", side: "left" },
+  ];
+
+  pressControl(id: string): void {
+    const dir = SerpentinaEngine.TOUCH_DIR[id];
+    if (dir) this.pendingDirection = dir;
+  }
+
+  releaseControl(_id: string): void {
+    // sin estado mantenido: todos los controles son `tap`
   }
 
   // ── Input ───────────────────────────────────────────────────────────────────
