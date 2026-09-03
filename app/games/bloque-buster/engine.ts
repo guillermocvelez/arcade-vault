@@ -17,6 +17,12 @@ import { BRICK_COLORS, SKINS, type BrickKey } from "~/games/bloque-buster/skins"
 
 export type { Phase, EngineSnapshot } from "~/games/types";
 
+/** Sólo el eje horizontal de la cruz: mover la pala izq/der. */
+export const BLOQUE_BUSTER_TOUCH_CONTROLS: TouchControl[] = [
+  { id: "izq", label: "◀", kind: "hold", side: "left", shape: "dpad", dir: "left" },
+  { id: "der", label: "▶", kind: "hold", side: "left", shape: "dpad", dir: "right" },
+];
+
 const W = 800;
 const H = 600;
 
@@ -254,26 +260,16 @@ export class BloqueBusterEngine implements GameEngine {
   }
 
   // ── Capa táctil ─────────────────────────────────────────────────────────────
-  // Escribe en el mismo `keys` que consume `update()` para el paddle; `mousemove`
-  // queda intacto. Sin listeners nuevos en window.
-  private static readonly TOUCH_CODE: Record<string, string> = {
-    izq: "ArrowLeft",
-    der: "ArrowRight",
-  };
-
-  readonly touchControls: TouchControl[] = [
-    { id: "izq", label: "◀", kind: "hold", side: "left" },
-    { id: "der", label: "▶", kind: "hold", side: "right" },
-  ];
+  readonly touchControls = BLOQUE_BUSTER_TOUCH_CONTROLS;
 
   pressControl(id: string): void {
-    const code = BloqueBusterEngine.TOUCH_CODE[id];
-    if (code) this.keys[code] = true;
+    if (id === "izq") this.keys["ArrowLeft"] = true;
+    else if (id === "der") this.keys["ArrowRight"] = true;
   }
 
   releaseControl(id: string): void {
-    const code = BloqueBusterEngine.TOUCH_CODE[id];
-    if (code) this.keys[code] = false;
+    if (id === "izq") this.keys["ArrowLeft"] = false;
+    else if (id === "der") this.keys["ArrowRight"] = false;
   }
 
   // ── Input ───────────────────────────────────────────────────────────────────

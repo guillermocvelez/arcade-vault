@@ -15,6 +15,21 @@ import { SKINS } from "~/games/asteroids/skins";
 
 export type { Phase, EngineSnapshot } from "~/games/types";
 
+/** Cruz de 3 brazos (girar izq/der + propulsar arriba) + botón de acción (disparar). */
+export const ROCAS_TOUCH_CONTROLS: TouchControl[] = [
+  { id: "girar-izq", label: "◀", kind: "hold", side: "left", shape: "dpad", dir: "left" },
+  { id: "girar-der", label: "▶", kind: "hold", side: "left", shape: "dpad", dir: "right" },
+  { id: "propulsar", label: "▲", kind: "hold", side: "left", shape: "dpad", dir: "up" },
+  { id: "disparar", label: "●", kind: "tap", side: "right", shape: "round" },
+];
+
+const TOUCH_CODES: Record<string, string> = {
+  "girar-izq": "ArrowLeft",
+  "girar-der": "ArrowRight",
+  propulsar: "ArrowUp",
+  disparar: "Space",
+};
+
 const W = 800;
 const H = 600;
 
@@ -479,37 +494,18 @@ export class AsteroidsEngine implements GameEngine {
   }
 
   // ── Capa táctil ─────────────────────────────────────────────────────────────
-  // Enruta al mismo estado de input que el teclado (`keys` / `justPressed`);
-  // no registra listeners nuevos en window.
-  private static readonly TOUCH_CODE: Record<string, string> = {
-    "girar-izq": "ArrowLeft",
-    "girar-der": "ArrowRight",
-    propulsar: "ArrowUp",
-    disparar: "Space",
-  };
-
-  readonly touchControls: TouchControl[] = [
-    { id: "girar-izq", label: "◀", kind: "hold", side: "left" },
-    { id: "girar-der", label: "▶", kind: "hold", side: "left" },
-    { id: "propulsar", label: "▲", kind: "hold", side: "right" },
-    { id: "disparar", label: "●", kind: "tap", side: "right" },
-  ];
+  readonly touchControls = ROCAS_TOUCH_CONTROLS;
 
   pressControl(id: string): void {
-    const code = AsteroidsEngine.TOUCH_CODE[id];
+    const code = TOUCH_CODES[id];
     if (!code) return;
-    if (code === "Space") {
-      // tap: pulso discreto, equivale al keydown que `update()` consume vía `pressed("Space")`
-      this.justPressed["Space"] = true;
-      return;
-    }
-    if (!this.keys[code]) this.justPressed[code] = true;
+    this.justPressed[code] = true;
     this.keys[code] = true;
   }
 
   releaseControl(id: string): void {
-    const code = AsteroidsEngine.TOUCH_CODE[id];
-    if (!code || code === "Space") return;
+    const code = TOUCH_CODES[id];
+    if (!code) return;
     this.keys[code] = false;
   }
 
