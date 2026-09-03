@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { BloqueBusterEngine, type EngineSnapshot } from "~/games/bloque-buster/engine";
+import {
+  BloqueBusterEngine,
+  BLOQUE_BUSTER_TOUCH_CONTROLS,
+  type EngineSnapshot,
+} from "~/games/bloque-buster/engine";
 import type { SkinId } from "~/games/types";
 
 const props = defineProps<{ skin?: SkinId }>();
@@ -40,7 +44,14 @@ const pause = () => engine?.pause();
 const resume = () => engine?.resume();
 const restart = () => engine?.restart();
 
-defineExpose({ pause, resume, restart });
+defineExpose({
+  pause,
+  resume,
+  restart,
+  touchControls: BLOQUE_BUSTER_TOUCH_CONTROLS,
+  pressControl: (id: string) => engine?.pressControl(id),
+  releaseControl: (id: string) => engine?.releaseControl(id),
+});
 </script>
 
 <template>

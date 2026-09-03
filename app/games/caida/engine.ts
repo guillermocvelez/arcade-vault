@@ -6,10 +6,21 @@
 // acumulación del original (dropAccum += dt contra dropInterval) pero con dt
 // en segundos y clamped a 0.05s, igual que el resto del contrato de motores.
 
-import type { EngineSnapshot, GameEngine, Palette, SkinId } from "~/games/types";
+import type { EngineSnapshot, GameEngine, Palette, SkinId, TouchControl } from "~/games/types";
 import { PIECE_COLORS, SKINS } from "~/games/caida/skins";
 
 export type { EngineSnapshot } from "~/games/types";
+
+/** Cruz (izq/der/abajo) + botones A (rotar) / B (soltar = hard-drop). */
+export const CAIDA_TOUCH_CONTROLS: TouchControl[] = [
+  { id: "izq", label: "◀", kind: "tap", side: "left", shape: "dpad", dir: "left" },
+  { id: "der", label: "▶", kind: "tap", side: "left", shape: "dpad", dir: "right" },
+  { id: "bajar", label: "▼", kind: "hold", side: "left", shape: "dpad", dir: "down" },
+  { id: "rotar", label: "⟳", kind: "tap", side: "right", shape: "round" },
+  { id: "soltar", label: "⤓", kind: "tap", side: "right", shape: "round" },
+];
+
+const SOFT_DROP_INTERVAL = 0.05; // s entre pasos mientras se mantiene "bajar" (táctil)
 
 const COLS = 10;
 const ROWS = 20;
@@ -91,6 +102,9 @@ export class CaidaEngine implements GameEngine {
   private dropInterval = 1;
   private dropAccum = 0;
 
+  private softDropHeld = false; // botón táctil "bajar" mantenido
+  private softDropAccum = 0;
+
   private running = false;
   private paused = false;
   private rafId: number | null = null;
@@ -168,6 +182,38 @@ export class CaidaEngine implements GameEngine {
     this.snapshotCb = cb;
   }
 
+  // ── Capa táctil ─────────────────────────────────────────────────────────────
+  readonly touchControls = CAIDA_TOUCH_CONTROLS;
+
+  pressControl(id: string): void {
+    if (!this.running || this.paused || this.phase !== "playing") return;
+    switch (id) {
+      case "izq":
+        this.tryMove(-1);
+        break;
+      case "der":
+        this.tryMove(1);
+        break;
+      case "rotar":
+        this.tryRotate();
+        break;
+      case "soltar":
+        this.hardDrop();
+        break;
+      case "bajar":
+        this.softDropHeld = true;
+        this.softDropAccum = SOFT_DROP_INTERVAL; // primer paso inmediato
+        break;
+    }
+  }
+
+  releaseControl(id: string): void {
+    if (id === "bajar") {
+      this.softDropHeld = false;
+      this.softDropAccum = 0;
+    }
+  }
+
   // ── Input ───────────────────────────────────────────────────────────────────
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     if (CONTROL_CODES.has(e.code)) e.preventDefault();
@@ -209,6 +255,16 @@ export class CaidaEngine implements GameEngine {
 
   private update(dt: number): void {
     if (this.phase === "gameover") return;
+
+    // Soft-drop táctil: mientras "bajar" está mantenido, un paso cada SOFT_DROP_INTERVAL.
+    if (this.softDropHeld) {
+      this.softDropAccum += dt;
+      while (this.softDropAccum >= SOFT_DROP_INTERVAL && this.phase === "playing") {
+        this.softDropAccum -= SOFT_DROP_INTERVAL;
+        this.softDrop();
+      }
+    }
+
     this.dropAccum += dt;
     if (this.dropAccum >= this.dropInterval) {
       this.dropAccum = 0;
@@ -342,6 +398,8 @@ export class CaidaEngine implements GameEngine {
     this.phase = "playing";
     this.dropInterval = 1;
     this.dropAccum = 0;
+    this.softDropHeld = false;
+    this.softDropAccum = 0;
     this.next = this.randomPiece();
     this.spawn();
   }

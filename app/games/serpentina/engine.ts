@@ -4,10 +4,25 @@
 // obtenido de https://www.spriters-resource.com/browser_games/googlesnakegame/,
 // ver spec 09 — Riesgos).
 
-import type { EngineSnapshot, GameEngine, Palette, Phase, SkinId } from "~/games/types";
+import type {
+  EngineSnapshot,
+  GameEngine,
+  Palette,
+  Phase,
+  SkinId,
+  TouchControl,
+} from "~/games/types";
 import { SKINS } from "~/games/serpentina/skins";
 
 export type { Phase, EngineSnapshot } from "~/games/types";
+
+/** Cruz direccional completa de 4 brazos. */
+export const SERPENTINA_TOUCH_CONTROLS: TouchControl[] = [
+  { id: "arriba", label: "▲", kind: "tap", side: "left", shape: "dpad", dir: "up" },
+  { id: "abajo", label: "▼", kind: "tap", side: "left", shape: "dpad", dir: "down" },
+  { id: "izq", label: "◀", kind: "tap", side: "left", shape: "dpad", dir: "left" },
+  { id: "der", label: "▶", kind: "tap", side: "left", shape: "dpad", dir: "right" },
+];
 
 interface FruitSprite {
   x: number;
@@ -95,6 +110,13 @@ const DIRECTION_KEYS: Record<string, Direction> = {
 };
 
 const ARROW_CODES = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
+
+const TOUCH_DIRS: Record<string, Direction> = {
+  arriba: "up",
+  abajo: "down",
+  izq: "left",
+  der: "right",
+};
 
 export class SerpentinaEngine implements GameEngine {
   private readonly ctx: CanvasRenderingContext2D;
@@ -184,6 +206,18 @@ export class SerpentinaEngine implements GameEngine {
 
   onSnapshot(cb: (s: EngineSnapshot) => void): void {
     this.snapshotCb = cb;
+  }
+
+  // ── Capa táctil ─────────────────────────────────────────────────────────────
+  readonly touchControls = SERPENTINA_TOUCH_CONTROLS;
+
+  pressControl(id: string): void {
+    const dir = TOUCH_DIRS[id];
+    if (dir) this.pendingDirection = dir; // el bloqueo de giro de 180° vive en step()
+  }
+
+  releaseControl(): void {
+    // sin estado mantenido: los 4 brazos son "tap"
   }
 
   // ── Input ───────────────────────────────────────────────────────────────────

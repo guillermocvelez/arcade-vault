@@ -5,10 +5,23 @@
 // paddle, bola y explosiones se dibujan con fillRect/arc en vez de drawImage contra
 // el spritesheet original (sin sprites ni audio, ver spec 08 — Decisiones).
 
-import type { EngineSnapshot, GameEngine, Palette, Phase, SkinId } from "~/games/types";
+import type {
+  EngineSnapshot,
+  GameEngine,
+  Palette,
+  Phase,
+  SkinId,
+  TouchControl,
+} from "~/games/types";
 import { BRICK_COLORS, SKINS, type BrickKey } from "~/games/bloque-buster/skins";
 
 export type { Phase, EngineSnapshot } from "~/games/types";
+
+/** Sólo el eje horizontal de la cruz: mover la pala izq/der. */
+export const BLOQUE_BUSTER_TOUCH_CONTROLS: TouchControl[] = [
+  { id: "izq", label: "◀", kind: "hold", side: "left", shape: "dpad", dir: "left" },
+  { id: "der", label: "▶", kind: "hold", side: "left", shape: "dpad", dir: "right" },
+];
 
 const W = 800;
 const H = 600;
@@ -244,6 +257,19 @@ export class BloqueBusterEngine implements GameEngine {
 
   onSnapshot(cb: (s: EngineSnapshot) => void): void {
     this.snapshotCb = cb;
+  }
+
+  // ── Capa táctil ─────────────────────────────────────────────────────────────
+  readonly touchControls = BLOQUE_BUSTER_TOUCH_CONTROLS;
+
+  pressControl(id: string): void {
+    if (id === "izq") this.keys["ArrowLeft"] = true;
+    else if (id === "der") this.keys["ArrowRight"] = true;
+  }
+
+  releaseControl(id: string): void {
+    if (id === "izq") this.keys["ArrowLeft"] = false;
+    else if (id === "der") this.keys["ArrowRight"] = false;
   }
 
   // ── Input ───────────────────────────────────────────────────────────────────

@@ -3,10 +3,32 @@
 // sin globals de window/document del original — el canvas se recibe por
 // constructor y los listeners de teclado se agregan/quitan en start()/stop().
 
-import type { EngineSnapshot, GameEngine, Palette, Phase, SkinId } from "~/games/types";
+import type {
+  EngineSnapshot,
+  GameEngine,
+  Palette,
+  Phase,
+  SkinId,
+  TouchControl,
+} from "~/games/types";
 import { SKINS } from "~/games/asteroids/skins";
 
 export type { Phase, EngineSnapshot } from "~/games/types";
+
+/** Cruz de 3 brazos (girar izq/der + propulsar arriba) + botón de acción (disparar). */
+export const ROCAS_TOUCH_CONTROLS: TouchControl[] = [
+  { id: "girar-izq", label: "◀", kind: "hold", side: "left", shape: "dpad", dir: "left" },
+  { id: "girar-der", label: "▶", kind: "hold", side: "left", shape: "dpad", dir: "right" },
+  { id: "propulsar", label: "▲", kind: "hold", side: "left", shape: "dpad", dir: "up" },
+  { id: "disparar", label: "●", kind: "tap", side: "right", shape: "round" },
+];
+
+const TOUCH_CODES: Record<string, string> = {
+  "girar-izq": "ArrowLeft",
+  "girar-der": "ArrowRight",
+  propulsar: "ArrowUp",
+  disparar: "Space",
+};
 
 const W = 800;
 const H = 600;
@@ -469,6 +491,22 @@ export class AsteroidsEngine implements GameEngine {
 
   onSnapshot(cb: (s: EngineSnapshot) => void): void {
     this.snapshotCb = cb;
+  }
+
+  // ── Capa táctil ─────────────────────────────────────────────────────────────
+  readonly touchControls = ROCAS_TOUCH_CONTROLS;
+
+  pressControl(id: string): void {
+    const code = TOUCH_CODES[id];
+    if (!code) return;
+    this.justPressed[code] = true;
+    this.keys[code] = true;
+  }
+
+  releaseControl(id: string): void {
+    const code = TOUCH_CODES[id];
+    if (!code) return;
+    this.keys[code] = false;
   }
 
   // ── Input ───────────────────────────────────────────────────────────────────

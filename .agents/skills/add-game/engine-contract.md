@@ -24,18 +24,24 @@ export class AsteroidsEngine {
   restart(): void; // re-runs the init routine, keeps running
   getSnapshot(): EngineSnapshot;
   onSnapshot(cb: (s: EngineSnapshot) => void): void; // single callback, invoked once per frame
+
+  // touch layer (mobile) — see §9
+  readonly touchControls: TouchControl[]; // static per engine; [] if the game has no touch controls
+  pressControl(id: string): void; // unknown id = silent no-op
+  releaseControl(id: string): void; // unknown id = silent no-op
 }
 ```
 
-| Method           | Contract                                                                                                                 | What breaks if you skip it                                                                                                                                                                                    |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `constructor`    | Only stores the 2D context. Does not start the loop. Throws (not returns null) if `getContext("2d")` fails.              | Silent black canvas with no error, hard to debug.                                                                                                                                                             |
-| `start()`        | Guards re-entry (`if (this.running) return`). Adds listeners, calls the init routine, kicks off `requestAnimationFrame`. | Calling it twice (e.g. HMR, double-mount) double-registers listeners.                                                                                                                                         |
-| `stop()`         | Cancels the rAF handle and removes the _same_ listener references added in `start()`.                                    | Listeners leak across route navigation — keyboard input from a game keeps firing on other pages. This is the #1 risk called out in spec 05.                                                                   |
-| `pause()`        | Only sets a flag. The rAF loop keeps calling `draw()` and the snapshot callback every frame — it just skips `update()`.  | If you cancel rAF on pause instead, the pause overlay drawn by the _page_ still shows, but the in-canvas frame freezes mid-motion instead of a clean stop; more importantly `resume()` has nothing to resume. |
-| `resume()`       | Must null out the timestamp used to compute `dt` (`lastTime = null`) before the next frame.                              | Skipping this produces one giant `dt` on resume — the physics jumps (asteroid teleports, ball skips through a wall).                                                                                          |
-| `restart()`      | Clears the terminal phase and re-runs full init — not a partial reset.                                                   | Leftover entities (bullets, particles, blocks) from the previous run bleed into the new one.                                                                                                                  |
-| `onSnapshot(cb)` | Stores one callback, invoked at the end of every frame inside the loop, **including while paused**.                      | If snapshot only fires on state changes, the pause overlay's stat-strip (score/lives/level) goes stale while paused.                                                                                          |
+| Method                                    | Contract                                                                                                                                                                                                               | What breaks if you skip it                                                                                                                                                                                    |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `constructor`                             | Only stores the 2D context. Does not start the loop. Throws (not returns null) if `getContext("2d")` fails.                                                                                                            | Silent black canvas with no error, hard to debug.                                                                                                                                                             |
+| `start()`                                 | Guards re-entry (`if (this.running) return`). Adds listeners, calls the init routine, kicks off `requestAnimationFrame`.                                                                                               | Calling it twice (e.g. HMR, double-mount) double-registers listeners.                                                                                                                                         |
+| `stop()`                                  | Cancels the rAF handle and removes the _same_ listener references added in `start()`.                                                                                                                                  | Listeners leak across route navigation — keyboard input from a game keeps firing on other pages. This is the #1 risk called out in spec 05.                                                                   |
+| `pause()`                                 | Only sets a flag. The rAF loop keeps calling `draw()` and the snapshot callback every frame — it just skips `update()`.                                                                                                | If you cancel rAF on pause instead, the pause overlay drawn by the _page_ still shows, but the in-canvas frame freezes mid-motion instead of a clean stop; more importantly `resume()` has nothing to resume. |
+| `resume()`                                | Must null out the timestamp used to compute `dt` (`lastTime = null`) before the next frame.                                                                                                                            | Skipping this produces one giant `dt` on resume — the physics jumps (asteroid teleports, ball skips through a wall).                                                                                          |
+| `restart()`                               | Clears the terminal phase and re-runs full init — not a partial reset.                                                                                                                                                 | Leftover entities (bullets, particles, blocks) from the previous run bleed into the new one.                                                                                                                  |
+| `onSnapshot(cb)`                          | Stores one callback, invoked at the end of every frame inside the loop, **including while paused**.                                                                                                                    | If snapshot only fires on state changes, the pause overlay's stat-strip (score/lives/level) goes stale while paused.                                                                                          |
+| `pressControl(id)` / `releaseControl(id)` | Route the touch id to the input state the engine **already has** (`keys[]`, `justPressed[]`, `pendingDirection`, …). No new `window` listeners. Respect `paused`/`phase` exactly like `onKeyDown`. Unknown id = no-op. | Duplicating game logic behind the touch path lets keyboard and touch drift apart; a new listener in the engine breaks the "listeners only in start()/stop()" rule.                                            |
 
 ## 2. JS → TS porting rules
 
@@ -231,3 +237,49 @@ Adapt from `specs/05-asteroids-rocas.md`'s criteria, which already cover the inv
 - "JUGAR DE NUEVO" starts a real new run, not just a visual counter reset.
 - Leaving the page (SALIR or navigation) stops the loop and removes all listeners — no console errors, no background loop.
 - Every other existing game (mock arena or other real engines) is visually and behaviorally unchanged.
+
+## 9. Touch controls layer (mobile)
+
+Added by `specs/10-controles-tactiles-movil.md`. Makes the real engines playable on a touch screen without a second input model: the engine only _describes_ the buttons it needs, a single shared component draws them.
+
+```ts
+// app/games/types.ts
+export interface TouchControl {
+  id: string; // stable kebab-case id, e.g. "girar-izq" — tested
+  label: string; // one system-font glyph, e.g. "◀" "▲" "⟳" "●" — no icon assets
+  kind: "hold" | "tap"; // hold = press+release held; tap = single pulse
+  side: "left" | "right"; // which cluster of the shell
+  shape: "dpad" | "round"; // dpad = arm of the directional cross; round = action button (A/B diagonal)
+  dir?: "up" | "down" | "left" | "right"; // required when shape:"dpad"
+}
+```
+
+**Engine side** — three members on `GameEngine`:
+
+- `readonly touchControls: TouchControl[]` — a **static** array, exported as a named const from the engine module (e.g. `ROCAS_TOUCH_CONTROLS`) and assigned to the field. `[]` if the game takes no touch input.
+- `pressControl(id)` / `releaseControl(id)` — route the id straight into the input state the engine already keeps:
+  - `kind:"hold"` → `pressControl` marks the input active (like a held `keydown`), `releaseControl` clears it (like `keyup`). The engine's `update()` already consumes that state.
+  - `kind:"tap"` → `pressControl` performs the action once (call the same method / set the same `justPressed` / `pendingDirection` the discrete `keydown` uses); `releaseControl` is a no-op.
+  - Same guards as `onKeyDown` (`paused`, `phase`). **No new `window` listeners** — pointer events live in the Vue component, never the engine.
+  - If a `tap` maps onto a `justPressed`-style map, set it **unconditionally** in `pressControl` (there is no key-repeat to debounce, and the pointer never sends a `keyup`).
+
+Descriptors in use:
+
+| Engine          | D-pad (`shape:"dpad"`)                                 | Action buttons (`shape:"round"`, A→B) |
+| --------------- | ------------------------------------------------------ | ------------------------------------- |
+| `rocas`         | `girar-izq` L, `girar-der` R, `propulsar` U — all hold | `disparar` (tap)                      |
+| `caida`         | `izq` L (tap), `der` R (tap), `bajar` D (hold)         | `rotar` A (tap), `soltar` B (tap)     |
+| `bloque-buster` | `izq` L (hold), `der` R (hold)                         | —                                     |
+| `serpentina`    | `arriba` U, `abajo` D, `izq` L, `der` R — all tap      | —                                     |
+
+`caida`'s `bajar` needs its own held-soft-drop accumulator in `update()` — keyboard relies on OS key-repeat, which touch does not send.
+
+**Vue side:**
+
+- `app/components/games/TouchControls.vue` — props `controls: TouchControl[]`, emits `press`/`release` with the id. Draws a `.tc-shell` (the console body) — a static panel that flows **below the `.crt`**, not an overlay on the canvas: a 3×3 grid cross for the `dpad` controls (placed by `dir`, inert centre hub) and the `round` controls on the A/B diagonal (`tc-pos-0` upper-right = A, `tc-pos-1` lower-left = B). `pointerdown` → `press` + `setPointerCapture` (in try/catch); for `hold`, `pointerup`/`pointercancel`/`pointerleave` → `release`, tracked by pointer id so a release outside the button still fires.
+- Each `*Game.vue` wrapper `defineExpose`s `touchControls` (the module const), `pressControl`, and `releaseControl` alongside `pause`/`resume`/`restart` — it does **not** render `<TouchControls>` itself.
+- `app/pages/juego/[id]/jugar.vue` owns the placement: `const coarse = useCoarsePointer()` + `<TouchControls v-if="coarse && gameRef?.touchControls?.length" :controls="gameRef.touchControls" @press="gameRef.pressControl($event)" @release="gameRef.releaseControl($event)" />` as a sibling of `.crt`. Desktop (fine pointer) never mounts it; mock games expose nothing so the `v-if` stays false.
+- `app/composables/useCoarsePointer.ts` — `matchMedia("(pointer: coarse)")`, SSR-safe (`false` until mounted), reacts to `change`.
+- CSS lives in `main.css` (`.tc-shell` / `.tc-dpad` / `.tc-key` / `.tc-round`) plus a `@media (pointer: coarse), (max-width: 720px)` block that collapses the player HUD (hides the Jugador tile and the Skin selector, trims the CRT bezel, hides `.crt-bottom`) so the CRT + control deck fit a phone in portrait without page scroll.
+
+Mock games (`gloton`, `invasores`, …) get no touch controls — only the responsive HUD.

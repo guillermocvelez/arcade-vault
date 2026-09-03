@@ -7,6 +7,9 @@ interface GameRef {
   pause(): void;
   resume(): void;
   restart(): void;
+  touchControls?: import("~/games/types").TouchControl[];
+  pressControl?(id: string): void;
+  releaseControl?(id: string): void;
 }
 
 const route = useRoute();
@@ -25,6 +28,8 @@ const { saveScore } = useScores();
 const realGame = computed(() => GAME_ENGINES[id] ?? null);
 const isRealGame = computed(() => !!realGame.value);
 const gameRef = ref<GameRef | null>(null);
+
+const coarse = useCoarsePointer();
 
 const skin = ref<SkinId>("clasico");
 
@@ -217,6 +222,13 @@ const handleSave = async () => {
         <span>CARGA · 1MB</span>
       </div>
     </div>
+
+    <TouchControls
+      v-if="coarse && gameRef?.touchControls?.length"
+      :controls="gameRef.touchControls"
+      @press="gameRef?.pressControl?.($event)"
+      @release="gameRef?.releaseControl?.($event)"
+    />
 
     <div v-if="over" class="modal-bd">
       <div class="modal">
