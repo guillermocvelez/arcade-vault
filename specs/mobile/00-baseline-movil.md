@@ -1,6 +1,6 @@
 # SPEC MÓVIL 00 — Baseline de navegador móvil
 
-> **Estado:** Borrador
+> **Estado:** Implementado
 > **Depende de:** SPEC 10 (capa táctil, ya implementada — se da por hecha)
 > **Fecha:** 2026-09-03
 > **Objetivo:** Establecer, de una sola vez, la infraestructura CSS/meta que todo el resto de specs móviles da por hecha: una escala de breakpoints única (2 puntos + `pointer: coarse`) que reemplaza los 8 actuales, custom properties de altura (`dvh`/`svh` con fallback `vh`) y de safe-area, el meta viewport con `viewport-fit=cover` + `theme-color`, el tamaño mínimo de objetivo táctil, la política de `prefers-reduced-motion` y de `overscroll-behavior`, y la checklist de aceptación móvil reutilizable que cada spec posterior rellena para su área.

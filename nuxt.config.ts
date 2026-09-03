@@ -23,6 +23,10 @@ export default defineNuxtConfig({
     head: {
       title: "Arcade Vault",
       htmlAttrs: { lang: "es" },
+      meta: [
+        { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+        { name: "theme-color", content: "#0a0a0f" },
+      ],
     },
   },
 });
