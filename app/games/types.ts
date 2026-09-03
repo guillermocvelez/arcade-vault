@@ -16,20 +16,24 @@ export interface Palette {
   //        ctx.shadowColor = color del propio elemento (nunca blanco)
 }
 
-/** Un botón táctil que el engine expone para que la capa Vue lo dibuje. */
-export interface TouchControl {
-  id: string; // identificador estable, p. ej. "girar-izq"
-  label: string; // glifo/carácter a pintar en el botón, p. ej. "◀" "▲" "⟳" "●"
-  kind: "hold" | "tap"; // hold = press+release mantenido; tap = pulso único
-  side: "left" | "right"; // en qué cúmulo (esquina) del stage se agrupa
-}
-
 export interface EngineSnapshot {
   score: number;
   lives: number;
   level: number;
   phase: Phase;
   extras?: Array<{ label: string; value: string }>;
+}
+
+/** Un control táctil que el engine expone para que la capa Vue lo dibuje.
+ *  `shape`/`dir` son sólo presentación (dónde pintar el control); no cambian
+ *  la semántica de `pressControl`/`releaseControl`. */
+export interface TouchControl {
+  id: string; // identificador estable, p. ej. "girar-izq"
+  label: string; // glifo a pintar, p. ej. "◀" "▲" "⟳" "●"
+  kind: "hold" | "tap"; // hold = press+release mantenido; tap = pulso único
+  side: "left" | "right"; // zona de la carcasa donde se agrupa
+  shape: "dpad" | "round"; // dpad = brazo de la cruz direccional; round = botón de acción (diagonal A/B)
+  dir?: "up" | "down" | "left" | "right"; // obligatorio si shape:"dpad"
 }
 
 export interface GameEngine {
@@ -42,7 +46,7 @@ export interface GameEngine {
   getSnapshot(): EngineSnapshot;
   onSnapshot(cb: (s: EngineSnapshot) => void): void;
 
-  // NUEVO — capa táctil
+  // Capa táctil (móvil). Ver §9 de engine-contract.md.
   readonly touchControls: TouchControl[]; // estático por engine; [] si no aplica
   pressControl(id: string): void; // id desconocido = no-op silencioso
   releaseControl(id: string): void; // id desconocido = no-op silencioso

@@ -11,6 +11,17 @@ import { PIECE_COLORS, SKINS } from "~/games/caida/skins";
 
 export type { EngineSnapshot } from "~/games/types";
 
+/** Cruz (izq/der/abajo) + botones A (rotar) / B (soltar = hard-drop). */
+export const CAIDA_TOUCH_CONTROLS: TouchControl[] = [
+  { id: "izq", label: "◀", kind: "tap", side: "left", shape: "dpad", dir: "left" },
+  { id: "der", label: "▶", kind: "tap", side: "left", shape: "dpad", dir: "right" },
+  { id: "bajar", label: "▼", kind: "hold", side: "left", shape: "dpad", dir: "down" },
+  { id: "rotar", label: "⟳", kind: "tap", side: "right", shape: "round" },
+  { id: "soltar", label: "⤓", kind: "tap", side: "right", shape: "round" },
+];
+
+const SOFT_DROP_INTERVAL = 0.05; // s entre pasos mientras se mantiene "bajar" (táctil)
+
 const COLS = 10;
 const ROWS = 20;
 const BLOCK = 30;
@@ -91,10 +102,8 @@ export class CaidaEngine implements GameEngine {
   private dropInterval = 1;
   private dropAccum = 0;
 
-  // Soft-drop mantenido desde el botón táctil `bajar` (el teclado lo consigue vía
-  // repetición de `keydown`; táctil no repite, así que lo modela una bandera).
-  private softDropping = false;
-  private static readonly SOFT_DROP_INTERVAL = 0.05;
+  private softDropHeld = false; // botón táctil "bajar" mantenido
+  private softDropAccum = 0;
 
   private running = false;
   private paused = false;
@@ -136,7 +145,6 @@ export class CaidaEngine implements GameEngine {
       this.rafId = null;
     }
     window.removeEventListener("keydown", this.onKeyDown);
-    this.softDropping = false;
   }
 
   pause(): void {
@@ -175,15 +183,7 @@ export class CaidaEngine implements GameEngine {
   }
 
   // ── Capa táctil ─────────────────────────────────────────────────────────────
-  // Enruta a las mismas acciones que `onKeyDown`, reusando su guard. Sin
-  // listeners nuevos en window.
-  readonly touchControls: TouchControl[] = [
-    { id: "izq", label: "◀", kind: "tap", side: "left" },
-    { id: "der", label: "▶", kind: "tap", side: "left" },
-    { id: "bajar", label: "▼", kind: "hold", side: "left" },
-    { id: "rotar", label: "⟳", kind: "tap", side: "right" },
-    { id: "soltar", label: "⤓", kind: "tap", side: "right" },
-  ];
+  readonly touchControls = CAIDA_TOUCH_CONTROLS;
 
   pressControl(id: string): void {
     if (!this.running || this.paused || this.phase !== "playing") return;
@@ -201,13 +201,17 @@ export class CaidaEngine implements GameEngine {
         this.hardDrop();
         break;
       case "bajar":
-        this.softDropping = true;
+        this.softDropHeld = true;
+        this.softDropAccum = SOFT_DROP_INTERVAL; // primer paso inmediato
         break;
     }
   }
 
   releaseControl(id: string): void {
-    if (id === "bajar") this.softDropping = false;
+    if (id === "bajar") {
+      this.softDropHeld = false;
+      this.softDropAccum = 0;
+    }
   }
 
   // ── Input ───────────────────────────────────────────────────────────────────
@@ -251,15 +255,21 @@ export class CaidaEngine implements GameEngine {
 
   private update(dt: number): void {
     if (this.phase === "gameover") return;
+
+    // Soft-drop táctil: mientras "bajar" está mantenido, un paso cada SOFT_DROP_INTERVAL.
+    if (this.softDropHeld) {
+      this.softDropAccum += dt;
+      while (this.softDropAccum >= SOFT_DROP_INTERVAL && this.phase === "playing") {
+        this.softDropAccum -= SOFT_DROP_INTERVAL;
+        this.softDrop();
+      }
+    }
+
     this.dropAccum += dt;
-    const interval = this.softDropping
-      ? Math.min(this.dropInterval, CaidaEngine.SOFT_DROP_INTERVAL)
-      : this.dropInterval;
-    if (this.dropAccum >= interval) {
+    if (this.dropAccum >= this.dropInterval) {
       this.dropAccum = 0;
       if (!this.collide(this.current.shape, this.current.x, this.current.y + 1)) {
         this.current.y++;
-        if (this.softDropping) this.score += 1; // mismo bonus que softDrop()
       } else {
         this.lockPiece();
       }
@@ -388,7 +398,8 @@ export class CaidaEngine implements GameEngine {
     this.phase = "playing";
     this.dropInterval = 1;
     this.dropAccum = 0;
-    this.softDropping = false;
+    this.softDropHeld = false;
+    this.softDropAccum = 0;
     this.next = this.randomPiece();
     this.spawn();
   }

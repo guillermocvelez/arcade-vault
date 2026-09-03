@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { EngineSnapshot, SkinId, TouchControl } from "~/games/types";
+import type { EngineSnapshot, SkinId } from "~/games/types";
 import { GAME_ENGINES } from "~/games/registry";
 import { SKIN_IDS, SKIN_STORAGE_KEY, resolveSkin } from "~/games/skins";
 
@@ -7,9 +7,9 @@ interface GameRef {
   pause(): void;
   resume(): void;
   restart(): void;
-  touchControls(): TouchControl[];
-  pressControl(id: string): void;
-  releaseControl(id: string): void;
+  touchControls?: import("~/games/types").TouchControl[];
+  pressControl?(id: string): void;
+  releaseControl?(id: string): void;
 }
 
 const route = useRoute();
@@ -29,8 +29,6 @@ const realGame = computed(() => GAME_ENGINES[id] ?? null);
 const isRealGame = computed(() => !!realGame.value);
 const gameRef = ref<GameRef | null>(null);
 
-// Player compacto en dispositivos de puntero grueso (spec 10): el CSS también
-// colapsa el HUD por debajo de 720px de ancho.
 const coarse = useCoarsePointer();
 
 const skin = ref<SkinId>("clasico");
@@ -140,10 +138,10 @@ const handleSave = async () => {
 </script>
 
 <template>
-  <div v-if="game" class="av-player fade-in" :class="{ 'av-player--compact': coarse }">
+  <div v-if="game" class="av-player fade-in">
     <div class="player-hud">
-      <div class="hud-stats">
-        <div class="hud-stat player">
+      <div style="display: flex; gap: 24px; flex-wrap: wrap">
+        <div class="hud-stat">
           <div class="l">Jugador</div>
           <div class="v" style="color: var(--ink)">{{ name }}</div>
         </div>
@@ -226,10 +224,10 @@ const handleSave = async () => {
     </div>
 
     <TouchControls
-      v-if="coarse && isRealGame && gameRef"
-      :controls="gameRef.touchControls()"
-      @press="gameRef?.pressControl($event)"
-      @release="gameRef?.releaseControl($event)"
+      v-if="coarse && gameRef?.touchControls?.length"
+      :controls="gameRef.touchControls"
+      @press="gameRef?.pressControl?.($event)"
+      @release="gameRef?.releaseControl?.($event)"
     />
 
     <div v-if="over" class="modal-bd">

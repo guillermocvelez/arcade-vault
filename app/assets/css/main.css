@@ -1003,11 +1003,6 @@ a {
   color: var(--yellow);
   text-shadow: 0 0 6px rgba(245, 255, 0, 0.5);
 }
-.hud-stats {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
-}
 .hud-actions {
   display: flex;
   gap: 10px;
@@ -1201,13 +1196,10 @@ a {
   align-items: center;
   justify-content: center;
   background: #000;
-  /* El gesto sobre el área de juego no scrollea, no hace zoom ni pull-to-refresh
-     (spec 10). Sólo acá y en .tc-btn — nunca en .crt ni .av-player. */
-  touch-action: none;
+  touch-action: none; /* el dedo sobre el juego no scrollea la página */
 }
 .game-canvas {
   display: block;
-  touch-action: none;
   max-width: 100%;
   max-height: 100%;
   width: auto;
@@ -1225,199 +1217,148 @@ a {
   border: 1px solid var(--line);
 }
 
-/* ===== controles táctiles (spec 10) =====
-   Botones tipo cabina de arcade en una barra BAJO el CRT (hay espacio vertical
-   libre en móvil y así no tapan zonas jugables del canvas ni pelean con el
-   aspect-ratio 4/3). Cyan = dirección mantenida (hold), magenta = acción
-   discreta (tap). Sin reacción a :hover — son sólo para dedo. */
-.tc-bar {
+/* ===== controles táctiles: carcasa tipo consola de mano, DEBAJO del CRT (solo puntero grueso) ===== */
+.tc-shell {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  margin-top: 14px;
-  padding: 0 2px;
-}
-.tc-cluster {
-  flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: clamp(8px, 2vw, 16px);
-}
-.tc-cluster.left {
-  justify-content: flex-start;
-}
-.tc-cluster.right {
-  justify-content: flex-end;
-}
-.tc-btn {
-  width: clamp(56px, 14vw, 72px);
-  height: clamp(56px, 14vw, 72px);
-  display: grid;
-  place-items: center;
-  padding: 0;
-  font-family: var(--mono);
-  font-size: clamp(20px, 5vw, 26px);
-  line-height: 1;
-  color: var(--cyan);
-  background: rgba(0, 0, 0, 0.45);
-  border: 2px solid var(--cyan);
-  border-radius: 50%;
+  gap: 18px;
+  max-width: 480px;
+  margin: 16px auto 0;
+  padding: 18px 20px calc(18px + env(safe-area-inset-bottom, 0px));
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(28, 26, 38, 0.92), rgba(10, 10, 16, 0.97));
   box-shadow:
-    0 0 12px rgba(0, 245, 255, 0.35),
-    inset 0 0 10px rgba(0, 245, 255, 0.15);
-  text-shadow: 0 0 8px rgba(0, 245, 255, 0.6);
-  cursor: pointer;
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 20px 44px -24px rgba(0, 0, 0, 0.9);
+  touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
-  touch-action: none;
-  transition:
-    transform 80ms ease-out,
-    box-shadow 80ms ease-out,
-    background 80ms ease-out;
-}
-.tc-btn[data-kind="tap"] {
-  color: var(--magenta);
-  border-color: var(--magenta);
-  box-shadow:
-    0 0 12px rgba(255, 0, 110, 0.35),
-    inset 0 0 10px rgba(255, 0, 110, 0.15);
-  text-shadow: 0 0 8px rgba(255, 0, 110, 0.6);
-}
-.tc-btn:active {
-  transform: translateY(2px) scale(0.94);
-  background: rgba(0, 245, 255, 0.16);
-  box-shadow:
-    0 0 20px rgba(0, 245, 255, 0.6),
-    inset 0 0 16px rgba(0, 245, 255, 0.3);
-}
-.tc-btn[data-kind="tap"]:active {
-  background: rgba(255, 0, 110, 0.16);
-  box-shadow:
-    0 0 20px rgba(255, 0, 110, 0.6),
-    inset 0 0 16px rgba(255, 0, 110, 0.3);
-}
-.tc-btn:focus-visible {
-  outline: 2px solid var(--yellow);
-  outline-offset: 2px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .tc-btn {
-    transition: none;
-  }
-  .tc-btn:active {
-    transform: none;
-  }
-}
-/* Puntero fino (escritorio): aunque el v-if ya evita montarla, la ocultamos por
-   las dudas en híbridos donde el componente pudiera renderizarse. */
-@media (pointer: fine) and (hover: hover) {
-  .tc-bar {
-    display: none;
-  }
 }
 
-/* ===== player compacto (spec 10) =====
-   Puntero grueso (.av-player--compact) o viewport angosto (<=720px): el HUD de
-   stats colapsa a una línea, se ocultan Jugador y el selector de Skin, y los
-   botones PAUSA/FIN/SALIR se achican para dejarle altura al CRT y a la barra
-   táctil que va debajo. */
-.av-player--compact .player-hud {
-  padding: 8px 12px;
-  margin-bottom: 12px;
-  gap: 8px 14px;
-}
-.av-player--compact .hud-stats {
-  gap: 4px 16px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.av-player--compact .hud-stats::-webkit-scrollbar {
-  display: none;
-}
-.av-player--compact .hud-stat {
-  flex-direction: row;
-  align-items: baseline;
-  gap: 6px;
-}
-.av-player--compact .hud-stat .l {
-  font-size: 8px;
-}
-.av-player--compact .hud-stat .v {
-  font-size: 12px;
-}
-.av-player--compact .hud-stat.player {
-  display: none;
-}
-.av-player--compact .skin-seg {
-  display: none;
-}
-.av-player--compact .hud-actions {
-  gap: 6px;
-}
-.av-player--compact .hud-actions .btn {
-  padding: 8px 10px;
-  font-size: 8px;
-}
-.av-player--compact .crt {
-  padding: 10px;
+.tc-dpad,
+.tc-actions {
+  border: 1px solid var(--line);
   border-radius: 16px;
+  background: rgba(4, 4, 8, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 6px 18px -8px rgba(0, 0, 0, 0.9);
 }
-.av-player--compact .crt-bottom {
-  margin-top: 8px;
-  font-size: 6px;
+
+.tc-dpad {
+  --tc-key: clamp(34px, 10vw, 46px);
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, var(--tc-key));
+  grid-template-rows: repeat(3, var(--tc-key));
+  grid-template-areas:
+    ".    up    ."
+    "left hub   right"
+    ".    down  .";
+  gap: 3px;
+  padding: 8px;
+  flex: none;
 }
-/* Mismo colapso por ancho, sin depender de JS (segundo disparador del spec). */
-@media (max-width: 720px) {
-  .av-player .player-hud {
-    padding: 8px 12px;
-    margin-bottom: 12px;
-    gap: 8px 14px;
-  }
-  .av-player .hud-stats {
-    gap: 4px 16px;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .av-player .hud-stats::-webkit-scrollbar {
-    display: none;
-  }
-  .av-player .hud-stat {
-    flex-direction: row;
-    align-items: baseline;
-    gap: 6px;
-  }
-  .av-player .hud-stat .l {
-    font-size: 8px;
-  }
-  .av-player .hud-stat .v {
-    font-size: 12px;
-  }
-  .av-player .hud-stat.player {
-    display: none;
-  }
-  .av-player .skin-seg {
-    display: none;
-  }
-  .av-player .hud-actions {
-    gap: 6px;
-  }
-  .av-player .hud-actions .btn {
-    padding: 8px 10px;
-    font-size: 8px;
-  }
-  .av-player .crt {
-    padding: 10px;
-    border-radius: 16px;
-  }
-  .av-player .crt-bottom {
-    margin-top: 8px;
-    font-size: 6px;
-  }
+.tc-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--ink-dim);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: none;
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition:
+    color 90ms,
+    border-color 90ms,
+    background 90ms;
+}
+.tc-key > span {
+  opacity: 0.45;
+}
+.tc-up {
+  grid-area: up;
+  border-radius: 9px 9px 0 0;
+}
+.tc-down {
+  grid-area: down;
+  border-radius: 0 0 9px 9px;
+}
+.tc-left {
+  grid-area: left;
+  border-radius: 9px 0 0 9px;
+}
+.tc-right {
+  grid-area: right;
+  border-radius: 0 9px 9px 0;
+}
+.tc-hub {
+  grid-area: hub;
+  background: rgba(0, 0, 0, 0.5);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.tc-key:active {
+  color: var(--cyan);
+  border-color: var(--cyan);
+  background: rgba(0, 245, 255, 0.12);
+  box-shadow: inset 0 2px 7px rgba(0, 0, 0, 0.8);
+  transform: translateY(1px);
+}
+
+.tc-actions {
+  position: relative;
+  flex: none;
+  width: clamp(124px, 36vw, 152px);
+  height: clamp(104px, 30vw, 128px);
+}
+.tc-actions.single {
+  width: clamp(64px, 18vw, 76px);
+  height: clamp(64px, 18vw, 76px);
+}
+.tc-round {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(52px, 15vw, 64px);
+  height: clamp(52px, 15vw, 64px);
+  border-radius: 50%;
+  border: 1px solid var(--cyan);
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--cyan);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: none;
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.55),
+    0 0 12px rgba(0, 245, 255, 0.14);
+}
+.tc-pos-0 {
+  top: 7px;
+  right: 7px;
+} /* A */
+.tc-pos-1 {
+  bottom: 7px;
+  left: 7px;
+} /* B */
+.tc-actions.single .tc-round {
+  inset: 7px;
+}
+.tc-round:active {
+  background: rgba(0, 245, 255, 0.16);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8);
+  transform: translateY(1px);
 }
 
 /* game over modal */
@@ -1861,6 +1802,55 @@ a {
   }
   .av-player {
     padding: 0 16px 32px;
+  }
+}
+
+/* ===== player compacto: puntero grueso o viewport angosto ===== */
+@media (pointer: coarse), (max-width: 720px) {
+  .av-player {
+    margin: 14px auto;
+    padding-bottom: 24px;
+  }
+  /* menos bisel y sin la tira decorativa: el alto se reparte entre CRT y carcasa */
+  .crt {
+    padding: 10px;
+    border-radius: 16px;
+  }
+  .crt-bottom {
+    display: none;
+  }
+  .player-hud {
+    gap: 8px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+  }
+  .player-hud > div:first-child {
+    gap: 14px !important;
+  }
+  /* oculta la tile "Jugador" — es configuración, no juego */
+  .player-hud .hud-stat:first-child {
+    display: none;
+  }
+  .hud-stat {
+    gap: 2px;
+  }
+  .hud-stat .l {
+    font-size: 8px;
+    letter-spacing: 0.1em;
+  }
+  .hud-stat .v {
+    font-size: 12px;
+  }
+  /* oculta el selector de Skin en el layout compacto */
+  .skin-seg {
+    display: none;
+  }
+  .hud-actions {
+    gap: 8px;
+  }
+  .hud-actions .btn {
+    padding: 9px 11px;
+    font-size: 10px;
   }
 }
 
