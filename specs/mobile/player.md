@@ -1,6 +1,6 @@
 # SPEC MÓVIL — Player (`/juego/[id]/jugar`)
 
-> **Estado:** Borrador
+> **Estado:** Approved
 > **Depende de:** SPEC MÓVIL 00 (`00-baseline-movil.md`) · SPEC 10 (capa táctil, implementada)
 > **Fecha:** 2026-09-03
 > **Objetivo:** Hacer que la ruta del player (`app/pages/juego/[id]/jugar.vue`) — marco CRT, canvas de los 4 engines reales, HUD de stats/acciones y carcasa táctil `.tc-shell` — se vea y se juegue bien en el navegador de un teléfono, en vertical (caso primario) y en horizontal (sin romper), aplicando los seis ejes de auditoría. Incluye la decisión transversal de **escalado de canvas: solo CSS, sin `devicePixelRatio` en el contrato `GameEngine`**.
