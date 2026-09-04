@@ -11,6 +11,23 @@ const emit = defineEmits<{
 type Dir = "up" | "down" | "left" | "right";
 const DIRS: Dir[] = ["up", "down", "left", "right"];
 
+// Nombre accesible por control, indexado por id, con fallback al glifo (label).
+// Es presentación: vive aquí, no en el tipo TouchControl ni en los *_TOUCH_CONTROLS.
+const ARIA: Record<string, string> = {
+  "girar-izq": "Girar a la izquierda",
+  "girar-der": "Girar a la derecha",
+  propulsar: "Propulsar",
+  disparar: "Disparar",
+  arriba: "Arriba",
+  abajo: "Abajo",
+  izq: "Izquierda",
+  der: "Derecha",
+  bajar: "Bajar",
+  rotar: "Rotar pieza",
+  soltar: "Soltar pieza",
+};
+const ariaFor = (c: TouchControl): string => ARIA[c.id] ?? c.label;
+
 const dpadByDir = computed<Partial<Record<Dir, TouchControl>>>(() => {
   const map: Partial<Record<Dir, TouchControl>> = {};
   for (const c of props.controls) {
@@ -56,7 +73,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="tc-shell" aria-hidden="true">
+  <div class="tc-shell" role="group" aria-label="Controles táctiles del juego">
     <div v-if="hasDpad" class="tc-dpad">
       <button
         v-for="d in DIRS"
@@ -65,6 +82,7 @@ onUnmounted(() => {
         type="button"
         class="tc-key"
         :class="`tc-${d}`"
+        :aria-label="dpadByDir[d] ? ariaFor(dpadByDir[d]) : undefined"
         @pointerdown="onDpadDown(d, $event)"
         @pointerup="onUp"
         @pointercancel="onUp"
@@ -83,6 +101,7 @@ onUnmounted(() => {
         type="button"
         class="tc-round"
         :class="`tc-pos-${i}`"
+        :aria-label="ariaFor(c)"
         @pointerdown="onDown(c, $event)"
         @pointerup="onUp"
         @pointercancel="onUp"
